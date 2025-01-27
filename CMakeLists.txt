@@ -235,6 +235,11 @@ endif()
 #------------------------------------------------------------------------------
 
 if(GEARSHIFFT_BACKEND_CLFFT)
+  # get library from vcpkg install
+  if(GEARSHIFFT_USE_VCPKG)
+    set(CLFFT_ROOT "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+  endif()
+
   # can help to find opencl from nvidia
   if(GEARSHIFFT_BACKEND_CUFFT AND NOT ENV{CUDA_PATH})
     set(ENV{CUDA_PATH} ${CUDA_TOOLKIT_ROOT_DIR})
@@ -305,6 +310,15 @@ endif()
 #------------------------------------------------------------------------------
 
 if(GEARSHIFFT_BACKEND_FFTW)
+  # get library from vcpkg install
+  if(GEARSHIFFT_USE_VCPKG)
+    if(NOT FFTW_USE_STATIC_LIBS)
+      message(WARNING "Most linux vcpkg triplets use static linkage yet FFTW_USE_STATIC_LIBS is not ON.
+                       gearshifft::FFTW may not enable.")
+    endif()
+    set(FFTW_ROOT "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+  endif()
+
   if(GEARSHIFFT_USE_STATIC_LIBS)
     set(FFTW_USE_STATIC_LIBS ON) # otherwise find libs automatically
   endif()
