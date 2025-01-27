@@ -1,0 +1,15 @@
+{
+  "dependencies": [
+    "boost",
+    "clfft",
+    "eigen3",
+    {
+      "name": "fftw3",
+      "features": [
+        "openmp"
+      ]
+    },
+    "half",
+    "intel-mkl"
+  ]
+}
