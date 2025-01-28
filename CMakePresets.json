@@ -17,6 +17,7 @@
         "CMAKE_EXPORT_COMPILE_COMMANDS": "YES",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
         "BUILD_TESTING": "ON",
+        "GEARSHIFFT_TESTS_ADD_CPU_ONLY": "ON",
         "GEARSHIFFT_USE_VCPKG": "ON",
         "FFTW_USE_STATIC_LIBS": "ON"
       }
