@@ -524,7 +524,7 @@ namespace fftw {
    * This class handles:
    * - {1D, 2D, 3D} x {R2C, C2R, C2C} x {inplace, outplace} x {float, double}.
    */
-  template<typename TFFT, // see fft_abstract.hpp (FFT_Inplace_Real, ...)
+  template<typename TFFT, // see fft.hpp (FFT_Inplace_Real, ...)
            typename TPrecision, // double, float
            size_t   NDim // 1..3
            >
