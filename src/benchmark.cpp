@@ -54,6 +54,18 @@ using FFTs              = List<Inplace_Real,
                                Outplace_Complex >;
 using Precisions        = List<float, double>;
 using FFT_Is_Normalized = std::false_type;
+#elif defined(EIGEN_ENABLED)
+#include "libraries/eigen/eigen.hpp"
+
+using namespace gearshifft::eigen;
+using Context           = EigenContext;
+using FFTs              = List<Inplace_Real,
+                               Inplace_Complex,
+                               Outplace_Real,
+                               Outplace_Complex >;
+using Precisions        = gearshifft::DefaultPrecisionsWithoutHalfPrecision;
+using FFT_Is_Normalized = std::true_type; // todo: I believe this is the case by default but
+                                          // it can be changed too?
 #endif
 
 // ----------------------------------------------------------------------------

@@ -501,6 +501,39 @@ if(GEARSHIFFT_BACKEND_ARMPL)
 
 endif()
 
+#------------------------------------------------------------------------------
+# Eigen FFT (Only with FFTW back-end for now)
+#------------------------------------------------------------------------------
+
+if(GEARSHIFFT_BACKEND_EIGEN)
+  if(NOT FFTW_FOUND)
+    message(WARNING "GEARSHIFFT_BACKEND_EIGEN is set to ON but FFTW could not be found.")
+  else()
+    find_package(Eigen3)
+
+    if(Eigen3_FOUND)
+      add_library(EIGEN INTERFACE)
+      add_library(gearshifft::EIGEN ALIAS EIGEN)
+
+      target_compile_definitions(EIGEN INTERFACE
+        EIGEN_ENABLED
+      )
+
+      target_link_libraries(EIGEN INTERFACE
+        Common
+        Eigen3::Eigen
+        FFTW # todo: when other back-ends are avaliable, make this one optional
+      )
+    
+      target_compile_options(EIGEN INTERFACE
+        -UFFTW_ENABLED # Undefine FFTW_ENABLED, linking against FFTW defines this
+      )
+
+      message(STATUS " gearshifft::EIGEN enabled.")
+    endif()
+  endif()
+endif()
+
 #-------------------------------------------------------------------------------
 
 if(NOT TARGET gearshifft::CUFFT
@@ -510,6 +543,7 @@ if(NOT TARGET gearshifft::CUFFT
     AND NOT TARGET gearshifft::ROCFFT
     AND NOT TARGET gearshifft::ESSL
     AND NOT TARGET gearshifft::ARMPL
+    AND NOT TARGET gearshifft::EIGEN
     )
   message(WARNING "No FFT backend found.")
 endif()

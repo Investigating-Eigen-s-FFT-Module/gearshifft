@@ -26,7 +26,10 @@ cmake_dependent_option(
 option(GEARSHIFFT_BACKEND_FFTWWRAPPERS  "Compile gearshifft_fftwwrappers if possible" ON)
 option(GEARSHIFFT_BACKEND_ESSL "Compile gearshifft_esslfftw if possible" ON)
 option(GEARSHIFFT_BACKEND_ARMPL "Compile gearshifft_armplfftw if possible" ON)
-
+cmake_dependent_option(
+  GEARSHIFFT_BACKEND_EIGEN "Compile gearshifft_eigen  if possible" ON
+  "GEARSHIFFT_BACKEND_FFTW" ON)
+ 
 # backend-disabler
 
 option(GEARSHIFFT_BACKEND_ROCFFT_ONLY "Disable all other backends" OFF)
