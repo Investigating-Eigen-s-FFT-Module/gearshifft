@@ -34,21 +34,19 @@ namespace gearshifft
   {
     class EigenOptions : public OptionsDefault
     {
+      public:
+        EigenOptions() : OptionsDefault() {
 
-    public:
-      EigenOptions() : OptionsDefault() {
-
-      }; // todo: add different back-ends as options
+        }; // todo: add different back-ends as options
     };
 
     namespace traits
     {
-
       template <typename T_Precision = float>
       struct plan
       {
         using ComplexType = std::complex<T_Precision>;
-        using RealType = float;
+        using RealType = T_Precision;
       };
 
       template <>
@@ -58,45 +56,26 @@ namespace gearshifft
         using RealType = double;
       };
 
-      template <typename T>
-      struct memory_api_impl
-      {
-      };
+      struct memory_api {
 
-      template <typename T>
-      struct memory_api
-      {
-        // T is either also an Eigen::Matrix (deep copy)
-        // or an Eigen::Map (shallow copy)
-        template <typename... EigenArgs>
-        static void dynamic_cpy(T &dest, Eigen::Matrix<EigenArgs...> &src)
-        {
-          memory_api_impl<T>::dynamic_copy(dest, src);
-        }
-      };
+        template <typename S, typename D>
+        static D *memcpy(D *destination, const S *source, size_t size) {
 
-      template <typename... EigenArgs>
-      struct memory_api_impl<Eigen::Matrix<EigenArgs...>>
-      {
-        using T = typename Eigen::Matrix<EigenArgs...>;
-        template <typename... EigenArgsSrc>
-        static void dynamic_cpy(T &dest, Eigen::Matrix<EigenArgsSrc...> &src)
-        {
-          dest = src; // calls copy-constructor
-        }
-      };
+          // If source type is_array, i.e. std::complex, reinterpret destination as array, too;
+          // otherwise keep the original type.
+          using R = std::conditional_t<std::is_array<S>::value, S, D>;
 
-      template <typename... EigenArgs>
-      struct memory_api_impl<Eigen::Map<EigenArgs...>>
-      {
-        using T = typename Eigen::Map<EigenArgs...>;
-        template <typename... EigenArgsSrc>
-        static void dynamic_cpy(T &dest, Eigen::Matrix<EigenArgsSrc...> &src)
-        {
-          dest = T(src.data(), src.rows(), src.cols());
+          return static_cast<D *>(std::memcpy(reinterpret_cast<R *>(destination), source, size));
         }
+        
+        template <typename S>
+        static S* malloc(size_t size) {
+          return static_cast<S*>(std::malloc(size * sizeof(S)));
+        }
+
+        static void free(void* p) { std::free(p); }
       };
-    };
+    }
 
     struct EigenContext : public ContextDefault<EigenOptions>
     {
@@ -141,7 +120,7 @@ namespace gearshifft
       // Eigen with FFTW backend only does ESTIMATE as of now!
       using ComplexType = typename traits::plan<TPrecision>::ComplexType;
       using RealType = typename traits::plan<TPrecision>::RealType;
-
+      using MemoryAPI = typename traits::memory_api;
       #if NDim != 1
       // #pragma message("WARNING: gearshifft_eigen only does 1D and will treat all dimensions with NDim == 1 for now\n")
       #endif
@@ -149,30 +128,27 @@ namespace gearshifft
       static constexpr bool IsInplace = TFFT::IsInplace;
       static constexpr bool IsComplex = TFFT::IsComplex;
       static constexpr bool IsInplaceReal = IsInplace && !IsComplex;
-      static constexpr bool IsOutplaceReal = !IsInplace && !IsComplex;
-
-      using value_type = typename std::conditional<IsOutplaceReal, RealType, ComplexType>::type;
-      using data_type = typename Eigen::Matrix<value_type,
-                                               Eigen::Dynamic,
-                                               /*NDim*/ 1,
-                                               Eigen::ColMajor>;
-      using data_complex_outplace_type = Eigen::Matrix<ComplexType,
-                                                       Eigen::Dynamic,
-                                                       /*NDim*/ 1,
-                                                       Eigen::ColMajor>;
-      // For in place FFT, let the complex output array FFT(input) just map to
-      // the input array
-      using data_complex_inplace_type = Eigen::Map<data_complex_outplace_type>;
-
-      using data_complex_type = typename std::conditional<IsInplace,
-                                                          data_complex_inplace_type,
-                                                          data_complex_outplace_type>::type;
 
       // todo: missing options: FFT(const impl_type& impl = impl_type(), Flag flags = Default)
-      using fft_wrapper_type = typename Eigen::FFT<value_type, Eigen::internal::fftw_impl<value_type>>;
+      using fft_wrapper_type = typename Eigen::FFT<TPrecision, Eigen::internal::fftw_impl<TPrecision>>;
+      using value_type = typename std::conditional<IsComplex, ComplexType, RealType>::type;
+      using eigen_data_type = Eigen::Matrix<
+        value_type,
+        Eigen::Dynamic,
+        1 /*NDim*/,
+        Eigen::ColMajor
+      >;
+      using eigen_data_complex_type = Eigen::Matrix<
+        ComplexType,
+        Eigen::Dynamic,
+        1 /*NDim*/,
+        Eigen::ColMajor
+      >;
+      using eigen_map_data_type = typename Eigen::Map<eigen_data_type>;
 
-      // different copy behaviour depending on whether data_complex_type is inplace/outplace
-      using MemoryAPI = typename traits::memory_api<data_complex_type>;
+      using eigen_map_data_complex_type = typename Eigen::Map<eigen_data_complex_type>;
+
+
       //////////////////////////////////////////////////////////////////////////////////////
 
       /// extents of the FFT input data
@@ -184,9 +160,10 @@ namespace gearshifft
       /// product of corresponding extents
       size_t n_complex_ = 0;
 
-      data_type data_;                 // Creates null-matrix with dynamic range(s),
-                                       // so no default allocation (also with fixed ranges)
-      data_complex_type data_complex_; // ditto ^
+      value_type* data_ = nullptr;     
+      ComplexType* data_complex_ = nullptr;
+      eigen_map_data_type* eigen_data_ = nullptr;
+      eigen_map_data_complex_type* eigen_data_complex_ = nullptr;
 
       /// size in nr of elements(!) of FFT input data
       size_t data_size_ = 0;
@@ -200,6 +177,7 @@ namespace gearshifft
         extents_ = interpret_as::column_major(cextents);
         extents_complex_ = extents_;
 
+        // is nfft in eigen implementation
         n_ = std::accumulate(extents_.begin(),
                              extents_.end(),
                              1,
@@ -216,14 +194,17 @@ namespace gearshifft
                                      std::multiplies<size_t>());
 
         data_size_ = (IsInplaceReal ? 2 * n_complex_ : n_);
-        if (!IsInplace)
+        if (!IsInplace) {
           data_complex_size_ = n_complex_;
-
+        }
+        else {
+          data_complex_size_ = data_size_;
+        }
         size_t total_mem = 95 * getMemorySize() / 100; // keep some memory available, otherwise an out-of-memory killer becomes more likely
-        if (total_mem < 3 * data_size_ + data_complex_size_)
+        if (total_mem < 3 * data_size_ * sizeof(value_type) + data_complex_size_ * sizeof(ComplexType))
         { // includes host input buffers
           std::stringstream ss;
-          ss << total_mem << "<" << 3 * data_size_ + data_complex_size_ << " (bytes)";
+          ss << total_mem << "<" << 3 * data_size_ * sizeof(value_type) + data_complex_size_ * sizeof(ComplexType) << " (bytes)";
           throw std::runtime_error("FFT data exceeds physical memory. " + ss.str());
         }
       }
@@ -235,18 +216,31 @@ namespace gearshifft
 
       void allocate()
       {
-        data_.resize(data_size_);                      // allocate through classic Eigen resize Method
-        MemoryAPI::dynamic_copy(data_complex_, data_); // will shallow or deep copy
-                                                       // depending on whether data_complex_ is a Map or not
+        data_ = MemoryAPI::malloc<value_type>(data_size_);
+        eigen_data_ = new eigen_map_data_type(data_, data_size_, /*NDim*/ 1);
+
+        if(IsInplace) {
+          data_complex_ = reinterpret_cast<ComplexType*>(data_);
+        }
+        else {
+          data_complex_ = MemoryAPI::malloc<ComplexType>(data_complex_size_);
+        }
+
+        eigen_data_complex_ = new eigen_map_data_complex_type(data_complex_, data_complex_size_, /*NDim*/ 1);
       }
 
       void destroy()
       {
-        // empty ctors by copy should call dtors on original data
-        data_ = data_type();
-        data_complex_ = data_complex_type();
-        eigen_fft_.impl().clear(); // flags are preserved but this at least deletes plans
-                                   // all is deleted through dtors at some point anyway
+        delete eigen_data_;
+        delete eigen_data_complex_;
+
+        if(data_)
+          MemoryAPI::free(data_);
+        data_ = nullptr;
+
+        if(data_complex_ && !IsInplace)
+          MemoryAPI::free(data_complex_);
+        data_complex_ = nullptr;
       }
 
       /**
@@ -265,7 +259,7 @@ namespace gearshifft
        */
       size_t get_transfer_size() {
         // when inplace-real then alloc'd data is bigger than data to be transferred
-        return IsInplaceReal ? n_*sizeof(RealType) : data_size_ * sizeof(data_type);
+        return IsInplaceReal ? n_*sizeof(RealType) : data_size_ * sizeof(value_type);
       }
 
       // ignoring for now
@@ -290,12 +284,12 @@ namespace gearshifft
 
       void execute_forward()
       {
-        eigen_fft_.fwd(data_complex_, data_);
+        eigen_fft_.fwd(*eigen_data_complex_, *eigen_data_);
       }
 
       void execute_inverse()
       {
-        eigen_fft_.inv(data_, data_complex_);
+        eigen_fft_.inv(*eigen_data_, *eigen_data_complex_);
       }
 
       // todo: how does reuseplan work? fft.hpp just seems to call init_inverse at
@@ -305,9 +299,27 @@ namespace gearshifft
       template <typename THostData>
       void upload(THostData *input)
       {
-        static_assert(std::is_same<THostData,value_type>::value);
-        Eigen::Map<Eigen::MatrixX<THostData>> tmp(input, data_size_ / /*NDim*/ 1, /*NDim*/ 1);
-        data_ = tmp; // todo: does this respect previous allocation for data_?
+        if(!IsInplaceReal){
+          MemoryAPI::memcpy(data_, input, data_size_);
+        } else {
+          const std::size_t max_z = (NDim >= 3 ? extents_[NDim-3] : 1);
+          const std::size_t max_y = (NDim >= 2 ? extents_[NDim-2] : 1);
+          const std::size_t max_x = extents_[NDim-1];
+          const std::size_t allocated_x = 2*(extents_[NDim-1]/2+1);
+
+          std::size_t input_index = 0;
+          std::size_t data_index = 0;
+
+          for(std::size_t z = 0;z < max_z;++z){
+            for(std::size_t y = 0;y < max_y;++y){
+              input_index = z*(max_y*max_x) + y*max_x;
+              data_index = z*(max_y*allocated_x) + y*allocated_x;
+              MemoryAPI::memcpy(data_ + data_index,
+                                input + input_index,
+                                max_x * sizeof(value_type));
+            }
+          }
+        }
       }
 
       // Assumes that THostData is a pointer to a value_type
@@ -315,7 +327,27 @@ namespace gearshifft
       void download(THostData *output)
       {
         static_assert(std::is_same<THostData,value_type>::value);
-        std::memcpy(output, data_.data(), data_size_ * sizeof(value_type));
+        if(!IsInplaceReal){
+          MemoryAPI::memcpy(output, data_, data_size_);
+        } else {
+          const std::size_t max_z = (NDim >= 3 ? extents_[NDim-3] : 1);
+          const std::size_t max_y = (NDim >= 2 ? extents_[NDim-2] : 1);
+          const std::size_t max_x = extents_[NDim-1];
+          const std::size_t allocated_x = 2*(extents_[NDim-1]/2+1);
+
+          std::size_t output_index = 0;
+          std::size_t data_index = 0;
+
+          for(std::size_t z = 0;z < max_z;++z){
+            for(std::size_t y = 0;y < max_y;++y){
+              output_index = z*(max_y*max_x) + y*max_x;
+              data_index = z*(max_y*allocated_x) + y*allocated_x;
+              MemoryAPI::memcpy(output+output_index,
+                                data_ + data_index,
+                                max_x * sizeof(value_type));
+            }
+          }
+        }
       }
     };
 
