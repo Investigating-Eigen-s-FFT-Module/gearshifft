@@ -63,7 +63,7 @@ using FFTs              = List<Inplace_Real,
                                Inplace_Complex,
                                Outplace_Real,
                                Outplace_Complex >;
-using Precisions        = gearshifft::DefaultPrecisionsWithoutHalfPrecision;
+using Precisions        = List<float, double>;
 using FFT_Is_Normalized = std::true_type; // todo: I believe this is the case by default but
                                           // it can be changed too?
 #endif

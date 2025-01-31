@@ -21,7 +21,12 @@
 
 #include <eigen3/Eigen/Dense>
 #include <eigen3/unsupported/Eigen/FFT>
-#include <fftw3.h> // technically not necessary, just for intellisense atm
+#include <fftw3.h>
+#include <eigen3/unsupported/Eigen/src/FFT/ei_fftw_impl.h> // include ei_fftw_impl
+                                                           // directly as opposed to defining
+                                                           // EIGEN_FFTW_DEFAULT
+                                                           // This should make switching
+                                                           // backends easier
 
 namespace gearshifft
 {
@@ -31,7 +36,9 @@ namespace gearshifft
     {
 
     public:
-      EigenOptions() : OptionsDefault() {}; // todo: add different back-ends as options
+      EigenOptions() : OptionsDefault() {
+
+      }; // todo: add different back-ends as options
     };
 
     namespace traits
@@ -61,8 +68,8 @@ namespace gearshifft
       {
         // T is either also an Eigen::Matrix (deep copy)
         // or an Eigen::Map (shallow copy)
-        template <typename T>
-        static void dynamic_cpy(T &dest, Eigen::Matrix &src)
+        template <typename... EigenArgs>
+        static void dynamic_cpy(T &dest, Eigen::Matrix<EigenArgs...> &src)
         {
           memory_api_impl<T>::dynamic_copy(dest, src);
         }
@@ -72,7 +79,8 @@ namespace gearshifft
       struct memory_api_impl<Eigen::Matrix<EigenArgs...>>
       {
         using T = typename Eigen::Matrix<EigenArgs...>;
-        static void dynamic_cpy(T &dest, Eigen::Matrix &src)
+        template <typename... EigenArgsSrc>
+        static void dynamic_cpy(T &dest, Eigen::Matrix<EigenArgsSrc...> &src)
         {
           dest = src; // calls copy-constructor
         }
@@ -82,7 +90,8 @@ namespace gearshifft
       struct memory_api_impl<Eigen::Map<EigenArgs...>>
       {
         using T = typename Eigen::Map<EigenArgs...>;
-        static void dynamic_cpy(T &dest, Eigen::Matrix &src)
+        template <typename... EigenArgsSrc>
+        static void dynamic_cpy(T &dest, Eigen::Matrix<EigenArgsSrc...> &src)
         {
           dest = T(src.data(), src.rows(), src.cols());
         }
@@ -132,31 +141,32 @@ namespace gearshifft
       // Eigen with FFTW backend only does ESTIMATE as of now!
       using ComplexType = typename traits::plan<TPrecision>::ComplexType;
       using RealType = typename traits::plan<TPrecision>::RealType;
-      using PlanType = typename traits::plan<TPrecision>::PlanType;
 
-      static_assert(NDim == 1, "[eigen.hpp]\treceived NDim not in 1, currently unsupported");
+      #if NDim != 1
+      // #pragma message("WARNING: gearshifft_eigen only does 1D and will treat all dimensions with NDim == 1 for now\n")
+      #endif
 
       static constexpr bool IsInplace = TFFT::IsInplace;
       static constexpr bool IsComplex = TFFT::IsComplex;
       static constexpr bool IsInplaceReal = IsInplace && !IsComplex;
-      static constexpr bool IsOutplaceReal = !InPlace && !IsComplex;
+      static constexpr bool IsOutplaceReal = !IsInplace && !IsComplex;
 
       using value_type = typename std::conditional<IsOutplaceReal, RealType, ComplexType>::type;
       using data_type = typename Eigen::Matrix<value_type,
                                                Eigen::Dynamic,
-                                               NDim,
+                                               /*NDim*/ 1,
                                                Eigen::ColMajor>;
       using data_complex_outplace_type = Eigen::Matrix<ComplexType,
                                                        Eigen::Dynamic,
-                                                       NDim,
+                                                       /*NDim*/ 1,
                                                        Eigen::ColMajor>;
       // For in place FFT, let the complex output array FFT(input) just map to
       // the input array
       using data_complex_inplace_type = Eigen::Map<data_complex_outplace_type>;
 
-      using data_complex_type = std::conditional<IsInplace,
-                                                 data_complex_inplace_type,
-                                                 data_complex_outplace_type>::type;
+      using data_complex_type = typename std::conditional<IsInplace,
+                                                          data_complex_inplace_type,
+                                                          data_complex_outplace_type>::type;
 
       // todo: missing options: FFT(const impl_type& impl = impl_type(), Flag flags = Default)
       using fft_wrapper_type = typename Eigen::FFT<value_type, Eigen::internal::fftw_impl<value_type>>;
@@ -173,9 +183,6 @@ namespace gearshifft
       size_t n_ = 0;
       /// product of corresponding extents
       size_t n_complex_ = 0;
-
-      PlanType fwd_plan_ = nullptr;
-      PlanType bwd_plan_ = nullptr;
 
       data_type data_;                 // Creates null-matrix with dynamic range(s),
                                        // so no default allocation (also with fixed ranges)
@@ -221,7 +228,7 @@ namespace gearshifft
         }
       }
 
-      ~FftwImpl()
+      ~EigenImpl()
       {
         destroy();
       }
@@ -250,6 +257,17 @@ namespace gearshifft
         return data_size_ * sizeof(value_type) + data_complex_size_ * sizeof(ComplexType);
       }
 
+      /**
+       * Returns size in bytes of one data transfer.
+       *
+       * Upload and download have the same size due to round-trip FFT.
+       * \return Size in bytes of FFT data to be transferred (to device or to host memory buffer).
+       */
+      size_t get_transfer_size() {
+        // when inplace-real then alloc'd data is bigger than data to be transferred
+        return IsInplaceReal ? n_*sizeof(RealType) : data_size_ * sizeof(data_type);
+      }
+
       // ignoring for now
       size_t get_plan_size()
       {
@@ -265,7 +283,7 @@ namespace gearshifft
         eigen_fft_ = fft_wrapper_type(); // re-call constructor (can also add opts later here)
         // Plan creation will happen in warmup rounds hopefully
       }
-      void init_reverse()
+      void init_inverse()
       {
         // Plan creation will happen in warmup rounds hopefully
       }
@@ -280,18 +298,15 @@ namespace gearshifft
         eigen_fft_.inv(data_, data_complex_);
       }
 
-      // todo: how does reuseplan work? fft.hpp just seems to call init_reverse at
+      // todo: how does reuseplan work? fft.hpp just seems to call init_inverse at
       // different points depending on whether it is set. I'm not sure how this works.
 
       // Assumes that THostData is a pointer to a value_type
       template <typename THostData>
       void upload(THostData *input)
       {
-        Eigen::Map < Eigen::Matrix<value_type,
-                                   data_size_ / NDim,
-                                   NDim,
-                                   Eigen::ColMajor>
-                         tmp(input);
+        static_assert(std::is_same<THostData,value_type>::value);
+        Eigen::Map<Eigen::MatrixX<THostData>> tmp(input, data_size_ / /*NDim*/ 1, /*NDim*/ 1);
         data_ = tmp; // todo: does this respect previous allocation for data_?
       }
 
@@ -299,6 +314,7 @@ namespace gearshifft
       template <typename THostData>
       void download(THostData *output)
       {
+        static_assert(std::is_same<THostData,value_type>::value);
         std::memcpy(output, data_.data(), data_size_ * sizeof(value_type));
       }
     };
