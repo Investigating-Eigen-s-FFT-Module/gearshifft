@@ -165,6 +165,8 @@ namespace gearshifft
       eigen_map_data_type* eigen_data_ = nullptr;
       eigen_map_data_complex_type* eigen_data_complex_ = nullptr;
 
+      // todo: find more suitable names for data_size_ & data_complex_size_ or use n_/n_complex_
+      // directly. Confusing otherwise.
       /// size in nr of elements(!) of FFT input data
       size_t data_size_ = 0;
       /// size in nr of elements(!) of FFT(input) for out-of-place transforms
@@ -182,11 +184,6 @@ namespace gearshifft
                              extents_.end(),
                              1,
                              std::multiplies<std::size_t>());
-
-        if (!IsComplex)
-        {
-          extents_complex_.back() = (extents_.back() / 2 + 1);
-        }
 
         n_complex_ = std::accumulate(extents_complex_.begin(),
                                      extents_complex_.end(),
