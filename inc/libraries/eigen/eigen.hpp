@@ -185,6 +185,11 @@ namespace gearshifft
                              1,
                              std::multiplies<std::size_t>());
 
+        // Only if HalfSpectrum is enabled!
+        if(!IsComplex){
+          extents_complex_.back() = (extents_.back()/2 + 1);
+        }
+
         n_complex_ = std::accumulate(extents_complex_.begin(),
                                      extents_complex_.end(),
                                      1,
@@ -215,7 +220,6 @@ namespace gearshifft
       {
         data_ = MemoryAPI::malloc<value_type>(data_size_);
         eigen_data_ = new eigen_map_data_type(data_, data_size_, /*NDim*/ 1);
-
         if(IsInplace) {
           data_complex_ = reinterpret_cast<ComplexType*>(data_);
         }
@@ -228,8 +232,13 @@ namespace gearshifft
 
       void destroy()
       {
-        delete eigen_data_;
-        delete eigen_data_complex_;
+        if(eigen_data_)
+          delete eigen_data_;
+        eigen_data_ = nullptr;
+
+        if(eigen_data_)
+          delete eigen_data_complex_;
+        eigen_data_complex_ = nullptr;
 
         if(data_)
           MemoryAPI::free(data_);
@@ -271,7 +280,9 @@ namespace gearshifft
       // todo: maybe with eigen_fft_.impl() you can get to it...
       void init_forward()
       {
-        eigen_fft_ = fft_wrapper_type(); // re-call constructor (can also add opts later here)
+        // re-call constructor (can also add opts later here)
+        eigen_fft_ = fft_wrapper_type(Eigen::internal::fftw_impl<TPrecision>(),
+                                      fft_wrapper_type::HalfSpectrum);
         // Plan creation will happen in warmup rounds hopefully
       }
       void init_inverse()
