@@ -59,8 +59,8 @@ using FFT_Is_Normalized = std::false_type;
 
 using namespace gearshifft::eigen;
 using Context           = EigenContext;
-using FFTs              = List<Inplace_Real,
-                               Inplace_Complex,
+using FFTs              = List</* Inplace_Real, */
+                              /* Inplace_Complex, */ // not possible with Eigen API (resize calls for half spectrum stuff on dst breaks it)
                                Outplace_Real,
                                Outplace_Complex >;
 using Precisions        = List<float, double>;

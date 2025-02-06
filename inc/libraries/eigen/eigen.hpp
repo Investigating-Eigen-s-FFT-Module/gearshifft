@@ -19,7 +19,11 @@
 #include <type_traits>
 #include <vector>
 
-#include <eigen3/Eigen/Dense>
+#define EIGEN_RUNTIME_NO_MALLOC                 // ensure that the allocate() allocates all memory and there
+                                                // is no dynamic allocation during other stages
+                                                // todo: remove once certain that no assertions are broken
+                                                //       as it adds overhead in measurements
+#include <eigen3/Eigen/Core>
 #include <eigen3/unsupported/Eigen/FFT>
 #include <fftw3.h>
 #include <eigen3/unsupported/Eigen/src/FFT/ei_fftw_impl.h> // include ei_fftw_impl
@@ -54,26 +58,6 @@ namespace gearshifft
       {
         using ComplexType = std::complex<double>;
         using RealType = double;
-      };
-
-      struct memory_api {
-
-        template <typename S, typename D>
-        static D *memcpy(D *destination, const S *source, size_t size) {
-
-          // If source type is_array, i.e. std::complex, reinterpret destination as array, too;
-          // otherwise keep the original type.
-          using R = std::conditional_t<std::is_array<S>::value, S, D>;
-
-          return static_cast<D *>(std::memcpy(reinterpret_cast<R *>(destination), source, size));
-        }
-        
-        template <typename S>
-        static S* malloc(size_t size) {
-          return static_cast<S*>(std::malloc(size * sizeof(S)));
-        }
-
-        static void free(void* p) { std::free(p); }
       };
     }
 
@@ -117,14 +101,15 @@ namespace gearshifft
       // COMPILE TIME FIELDS
 
       using Extent = std::array<std::size_t, NDim>;
-      // Eigen with FFTW backend only does ESTIMATE as of now!
+      // todo: Eigen with FFTW backend only does ESTIMATE as of now!
       using ComplexType = typename traits::plan<TPrecision>::ComplexType;
       using RealType = typename traits::plan<TPrecision>::RealType;
-      using MemoryAPI = typename traits::memory_api;
       #if NDim != 1
       // #pragma message("WARNING: gearshifft_eigen only does 1D and will treat all dimensions with NDim == 1 for now\n")
       #endif
 
+      // todo: get rid of Inplace stuff as it's not possible in current Eigen API
+      // keeping it for now for copy over to new eigen module...
       static constexpr bool IsInplace = TFFT::IsInplace;
       static constexpr bool IsComplex = TFFT::IsComplex;
       static constexpr bool IsInplaceReal = IsInplace && !IsComplex;
@@ -132,21 +117,18 @@ namespace gearshifft
       // todo: missing options: FFT(const impl_type& impl = impl_type(), Flag flags = Default)
       using fft_wrapper_type = typename Eigen::FFT<TPrecision, Eigen::internal::fftw_impl<TPrecision>>;
       using value_type = typename std::conditional<IsComplex, ComplexType, RealType>::type;
-      using eigen_data_type = Eigen::Matrix<
+      using data_type = Eigen::Matrix<
         value_type,
         Eigen::Dynamic,
         1 /*NDim*/,
         Eigen::ColMajor
       >;
-      using eigen_data_complex_type = Eigen::Matrix<
+      using data_complex_type = Eigen::Matrix<
         ComplexType,
         Eigen::Dynamic,
         1 /*NDim*/,
         Eigen::ColMajor
       >;
-      using eigen_map_data_type = typename Eigen::Map<eigen_data_type>;
-
-      using eigen_map_data_complex_type = typename Eigen::Map<eigen_data_complex_type>;
 
 
       //////////////////////////////////////////////////////////////////////////////////////
@@ -160,13 +142,9 @@ namespace gearshifft
       /// product of corresponding extents
       size_t n_complex_ = 0;
 
-      value_type* data_ = nullptr;     
-      ComplexType* data_complex_ = nullptr;
-      eigen_map_data_type* eigen_data_ = nullptr;
-      eigen_map_data_complex_type* eigen_data_complex_ = nullptr;
+      data_type* data_ = nullptr;     
+      data_complex_type* data_complex_ = nullptr;
 
-      // todo: find more suitable names for data_size_ & data_complex_size_ or use n_/n_complex_
-      // directly. Confusing otherwise.
       /// size in nr of elements(!) of FFT input data
       size_t data_size_ = 0;
       /// size in nr of elements(!) of FFT(input) for out-of-place transforms
@@ -176,6 +154,8 @@ namespace gearshifft
 
       EigenImpl(const Extent &cextents)
       {
+        Eigen::internal::set_is_malloc_allowed(false); // disable eigen internal malloc
+        
         extents_ = interpret_as::column_major(cextents);
         extents_complex_ = extents_;
 
@@ -218,34 +198,25 @@ namespace gearshifft
 
       void allocate()
       {
-        data_ = MemoryAPI::malloc<value_type>(data_size_);
-        eigen_data_ = new eigen_map_data_type(data_, data_size_, /*NDim*/ 1);
+        Eigen::internal::set_is_malloc_allowed(true); // enable eigen internal malloc
+        data_ = new data_type(data_size_);
         if(IsInplace) {
-          data_complex_ = reinterpret_cast<ComplexType*>(data_);
+          // hacky placement new: it's pretty cumbersome to try inplace fft with eigen module
+          data_complex_ = new (data_) data_complex_type(data_size_);
         }
         else {
-          data_complex_ = MemoryAPI::malloc<ComplexType>(data_complex_size_);
+          data_complex_ = new data_complex_type(data_complex_size_);
         }
-
-        eigen_data_complex_ = new eigen_map_data_complex_type(data_complex_, data_complex_size_, /*NDim*/ 1);
       }
 
       void destroy()
       {
-        if(eigen_data_)
-          delete eigen_data_;
-        eigen_data_ = nullptr;
-
-        if(eigen_data_)
-          delete eigen_data_complex_;
-        eigen_data_complex_ = nullptr;
-
         if(data_)
-          MemoryAPI::free(data_);
+          delete data_;
         data_ = nullptr;
 
         if(data_complex_ && !IsInplace)
-          MemoryAPI::free(data_complex_);
+          delete data_complex_;
         data_complex_ = nullptr;
       }
 
@@ -280,24 +251,29 @@ namespace gearshifft
       // todo: maybe with eigen_fft_.impl() you can get to it...
       void init_forward()
       {
+        Eigen::internal::set_is_malloc_allowed(true); // enable eigen internal malloc
         // re-call constructor (can also add opts later here)
         eigen_fft_ = fft_wrapper_type(Eigen::internal::fftw_impl<TPrecision>(),
                                       fft_wrapper_type::HalfSpectrum);
-        // Plan creation will happen in warmup rounds hopefully
+        // Plan creation will happen in warmup rounds hopefully, todo: I think I can make this better
+        // with some ugly tinkering so that plan creation actually happens here.
       }
       void init_inverse()
       {
+        Eigen::internal::set_is_malloc_allowed(true); // enable eigen internal malloc
         // Plan creation will happen in warmup rounds hopefully
       }
 
       void execute_forward()
       {
-        eigen_fft_.fwd(*eigen_data_complex_, *eigen_data_);
+        Eigen::internal::set_is_malloc_allowed(true); // disable eigen internal malloc
+        eigen_fft_.fwd(*data_complex_, *data_);
       }
 
       void execute_inverse()
       {
-        eigen_fft_.inv(*eigen_data_, *eigen_data_complex_);
+        Eigen::internal::set_is_malloc_allowed(true); // disable eigen internal malloc
+        eigen_fft_.inv(*data_, *data_complex_);
       }
 
       // todo: how does reuseplan work? fft.hpp just seems to call init_inverse at
@@ -307,72 +283,39 @@ namespace gearshifft
       template <typename THostData>
       void upload(THostData *input)
       {
-        if(!IsInplaceReal){
-          MemoryAPI::memcpy(data_, input, data_size_);
-        } else {
-          const std::size_t max_z = (NDim >= 3 ? extents_[NDim-3] : 1);
-          const std::size_t max_y = (NDim >= 2 ? extents_[NDim-2] : 1);
-          const std::size_t max_x = extents_[NDim-1];
-          const std::size_t allocated_x = 2*(extents_[NDim-1]/2+1);
-
-          std::size_t input_index = 0;
-          std::size_t data_index = 0;
-
-          for(std::size_t z = 0;z < max_z;++z){
-            for(std::size_t y = 0;y < max_y;++y){
-              input_index = z*(max_y*max_x) + y*max_x;
-              data_index = z*(max_y*allocated_x) + y*allocated_x;
-              MemoryAPI::memcpy(data_ + data_index,
-                                input + input_index,
-                                max_x * sizeof(value_type));
-            }
-          }
-        }
+        static_assert(std::is_same<THostData,value_type>::value
+                      && "upload(THostData *input) gave mismatched value type.");
+        // Todo: this will probably break with more than 1D Matrices and/or outer stride
+        //       once that is an option
+        std::memcpy(data_->data(), input, data_size_ * sizeof(value_type));
       }
 
       // Assumes that THostData is a pointer to a value_type
       template <typename THostData>
       void download(THostData *output)
       {
-        static_assert(std::is_same<THostData,value_type>::value);
-        if(!IsInplaceReal){
-          MemoryAPI::memcpy(output, data_, data_size_);
-        } else {
-          const std::size_t max_z = (NDim >= 3 ? extents_[NDim-3] : 1);
-          const std::size_t max_y = (NDim >= 2 ? extents_[NDim-2] : 1);
-          const std::size_t max_x = extents_[NDim-1];
-          const std::size_t allocated_x = 2*(extents_[NDim-1]/2+1);
-
-          std::size_t output_index = 0;
-          std::size_t data_index = 0;
-
-          for(std::size_t z = 0;z < max_z;++z){
-            for(std::size_t y = 0;y < max_y;++y){
-              output_index = z*(max_y*max_x) + y*max_x;
-              data_index = z*(max_y*allocated_x) + y*allocated_x;
-              MemoryAPI::memcpy(output+output_index,
-                                data_ + data_index,
-                                max_x * sizeof(value_type));
-            }
-          }
-        }
+        static_assert(std::is_same<THostData,value_type>::value
+                      && "download(THostData *output) gave mismatched value type.");
+        std::memcpy(output, data_->data(), data_size_ * sizeof(value_type));
       }
     };
 
-    using Inplace_Real = gearshifft::FFT<FFT_Inplace_Real,
-                                         FFT_Plan_Not_Reusable,
-                                         EigenImpl,
-                                         TimerCPU>;
+    // InPlace not possible through Eigen API
+    // using Inplace_Real = gearshifft::FFT<FFT_Inplace_Real,
+    //                                      FFT_Plan_Not_Reusable,
+    //                                      EigenImpl,
+    //                                      TimerCPU>;
 
     using Outplace_Real = gearshifft::FFT<FFT_Outplace_Real,
                                           FFT_Plan_Not_Reusable,
                                           EigenImpl,
                                           TimerCPU>;
 
-    using Inplace_Complex = gearshifft::FFT<FFT_Inplace_Complex,
-                                            FFT_Plan_Not_Reusable,
-                                            EigenImpl,
-                                            TimerCPU>;
+    // InPlace not possible through Eigen API
+    // using Inplace_Complex = gearshifft::FFT<FFT_Inplace_Complex,
+    //                                         FFT_Plan_Not_Reusable,
+    //                                         EigenImpl,
+    //                                         TimerCPU>;
 
     using Outplace_Complex = gearshifft::FFT<FFT_Outplace_Complex,
                                              FFT_Plan_Not_Reusable,
