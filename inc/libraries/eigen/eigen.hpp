@@ -273,6 +273,11 @@ namespace gearshifft
 
     // InPlace not possible through Eigen API
 
+    // Note: for uneven sizes, this will create mismatch as the Eigen API
+    //       sets the output size for a complex to real ifft to (2 * (src.size()-1))
+    //       as opposed to just reading dst.size(). It never assumes that dst.size()
+    //       has been set, which is where this guesswork is from.
+    //       todo: somehow skip radix357 runs  on this instantiation?
     using Outplace_Real = gearshifft::FFT<FFT_Outplace_Real,
                                           FFT_Plan_Not_Reusable,
                                           EigenImpl,
