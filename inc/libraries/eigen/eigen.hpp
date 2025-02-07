@@ -105,14 +105,11 @@ namespace gearshifft
       using ComplexType = typename traits::plan<TPrecision>::ComplexType;
       using RealType = typename traits::plan<TPrecision>::RealType;
       #if NDim != 1
+      // todo: what's a solution for this...
       // #pragma message("WARNING: gearshifft_eigen only does 1D and will treat all dimensions with NDim == 1 for now\n")
       #endif
 
-      // todo: get rid of Inplace stuff as it's not possible in current Eigen API
-      // keeping it for now for copy over to new eigen module...
-      static constexpr bool IsInplace = TFFT::IsInplace;
       static constexpr bool IsComplex = TFFT::IsComplex;
-      static constexpr bool IsInplaceReal = IsInplace && !IsComplex;
 
       // todo: missing options: FFT(const impl_type& impl = impl_type(), Flag flags = Default)
       using fft_wrapper_type = typename Eigen::FFT<TPrecision, Eigen::internal::fftw_impl<TPrecision>>;
@@ -130,17 +127,13 @@ namespace gearshifft
         Eigen::ColMajor
       >;
 
-
       //////////////////////////////////////////////////////////////////////////////////////
 
       /// extents of the FFT input data
       Extent extents_ = {{0}};
-      /// extents of the FFT complex data (=FFT(input))
-      Extent extents_complex_ = {{0}};
+
       /// product of corresponding extents
       size_t n_ = 0;
-      /// product of corresponding extents
-      size_t n_complex_ = 0;
 
       data_type* data_ = nullptr;     
       data_complex_type* data_complex_ = nullptr;
@@ -157,7 +150,6 @@ namespace gearshifft
         Eigen::internal::set_is_malloc_allowed(false); // disable eigen internal malloc
         
         extents_ = interpret_as::column_major(cextents);
-        extents_complex_ = extents_;
 
         // is nfft in eigen implementation
         n_ = std::accumulate(extents_.begin(),
@@ -165,23 +157,9 @@ namespace gearshifft
                              1,
                              std::multiplies<std::size_t>());
 
-        // Only if HalfSpectrum is enabled!
-        if(!IsComplex){
-          extents_complex_.back() = (extents_.back()/2 + 1);
-        }
+        data_size_ = n_;
+        data_complex_size_ = data_size_;
 
-        n_complex_ = std::accumulate(extents_complex_.begin(),
-                                     extents_complex_.end(),
-                                     1,
-                                     std::multiplies<size_t>());
-
-        data_size_ = (IsInplaceReal ? 2 * n_complex_ : n_);
-        if (!IsInplace) {
-          data_complex_size_ = n_complex_;
-        }
-        else {
-          data_complex_size_ = data_size_;
-        }
         size_t total_mem = 95 * getMemorySize() / 100; // keep some memory available, otherwise an out-of-memory killer becomes more likely
         if (total_mem < 3 * data_size_ * sizeof(value_type) + data_complex_size_ * sizeof(ComplexType))
         { // includes host input buffers
@@ -200,13 +178,7 @@ namespace gearshifft
       {
         Eigen::internal::set_is_malloc_allowed(true); // enable eigen internal malloc
         data_ = new data_type(data_size_);
-        if(IsInplace) {
-          // hacky placement new: it's pretty cumbersome to try inplace fft with eigen module
-          data_complex_ = new (data_) data_complex_type(data_size_);
-        }
-        else {
-          data_complex_ = new data_complex_type(data_complex_size_);
-        }
+        data_complex_ = new data_complex_type(data_complex_size_);
       }
 
       void destroy()
@@ -215,7 +187,7 @@ namespace gearshifft
           delete data_;
         data_ = nullptr;
 
-        if(data_complex_ && !IsInplace)
+        if(data_complex_)
           delete data_complex_;
         data_complex_ = nullptr;
       }
@@ -235,8 +207,7 @@ namespace gearshifft
        * \return Size in bytes of FFT data to be transferred (to device or to host memory buffer).
        */
       size_t get_transfer_size() {
-        // when inplace-real then alloc'd data is bigger than data to be transferred
-        return IsInplaceReal ? n_*sizeof(RealType) : data_size_ * sizeof(value_type);
+        return data_size_ * sizeof(value_type);
       }
 
       // ignoring for now
@@ -301,21 +272,11 @@ namespace gearshifft
     };
 
     // InPlace not possible through Eigen API
-    // using Inplace_Real = gearshifft::FFT<FFT_Inplace_Real,
-    //                                      FFT_Plan_Not_Reusable,
-    //                                      EigenImpl,
-    //                                      TimerCPU>;
 
     using Outplace_Real = gearshifft::FFT<FFT_Outplace_Real,
                                           FFT_Plan_Not_Reusable,
                                           EigenImpl,
                                           TimerCPU>;
-
-    // InPlace not possible through Eigen API
-    // using Inplace_Complex = gearshifft::FFT<FFT_Inplace_Complex,
-    //                                         FFT_Plan_Not_Reusable,
-    //                                         EigenImpl,
-    //                                         TimerCPU>;
 
     using Outplace_Complex = gearshifft::FFT<FFT_Outplace_Complex,
                                              FFT_Plan_Not_Reusable,
