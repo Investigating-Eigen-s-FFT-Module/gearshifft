@@ -6,6 +6,14 @@
     "license": "MPL-2.0",
     "dependencies": [
       {
+        "name": "pocketfft",
+        "host": true
+      },
+      {
+        "name": "fftw3",
+        "host": true
+      },
+      {
         "name": "vcpkg-cmake",
         "host": true
       },
