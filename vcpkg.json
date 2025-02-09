@@ -1,7 +1,10 @@
 {
   "dependencies": [
     "boost",
-    "eigen3",
+    {
+      "name": "eigen3",
+      "version>=": "3.4.0"
+    },
     {
       "name": "fftw3",
       "features": [
