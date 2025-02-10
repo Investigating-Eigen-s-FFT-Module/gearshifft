@@ -25,12 +25,19 @@
                                                 //       as it adds overhead in measurements
 #include <eigen3/Eigen/Core>
 #include <eigen3/unsupported/Eigen/FFT>
-#include <fftw3.h>
-#include <eigen3/unsupported/Eigen/src/FFT/ei_fftw_impl.h> // include ei_fftw_impl
-                                                           // directly as opposed to defining
-                                                           // EIGEN_FFTW_DEFAULT
-                                                           // This should make switching
-                                                           // backends easier
+
+// fft back-end selection at runtime proved impossible without Eigen API changes or overhead in benchmarks
+// Instead, several targets will be created using the FFT header's macros.
+// The title for the csv is set here.
+#ifdef EIGEN_FFTW_DEFAULT
+#define TITLE "eigen-fftw"
+#elif defined EIGEN_MKL_DEFAULT
+#define TITLE "eigen-mkl"
+#elif defined EIGEN_POCKETFFT_DEFAULT
+#define TITLE "eigen-pocketfft"
+#else
+#define TITLE "eigen-kissfft"
+#endif
 
 namespace gearshifft
 {
@@ -41,7 +48,7 @@ namespace gearshifft
       public:
         EigenOptions() : OptionsDefault() {
 
-        }; // todo: add different back-ends as options
+        }; // todo: add flags as options
     };
 
     namespace traits
@@ -65,8 +72,7 @@ namespace gearshifft
     {
       static const std::string title()
       {
-        // todo: differentiate different back-ends
-        return "eigen";
+        return TITLE;
       }
 
       static std::string get_device_list()
@@ -82,7 +88,7 @@ namespace gearshifft
       std::string get_used_device_properties()
       {
         std::ostringstream msg;
-
+        // todo: change in case multithread is allowed with some backend
         msg << "\"SupportedThreads\"," << 1
             << ",\"UsedThreads\"," << 1
             << ",\"TotalMemory\"," << getMemorySize();
@@ -92,8 +98,8 @@ namespace gearshifft
     };
 
     template <typename TFFT,       // see fft.hpp (FFT_Inplace_Real, ...)
-              typename TPrecision, // double
-              size_t NDim          // 1 todo: allow 2 and 3 with for loop
+              typename TPrecision, // foat, double
+              size_t NDim          // overriden to 1, 2 and 3D not allowed (todo: some way to skip thosee)
               >
     struct EigenImpl
     {
@@ -111,8 +117,8 @@ namespace gearshifft
 
       static constexpr bool IsComplex = TFFT::IsComplex;
 
-      // todo: missing options: FFT(const impl_type& impl = impl_type(), Flag flags = Default)
-      using fft_wrapper_type = typename Eigen::FFT<TPrecision, Eigen::internal::fftw_impl<TPrecision>>;
+      // todo: missing options: FFT(Flag flags = Default)
+      using fft_wrapper_type = typename Eigen::FFT<TPrecision>;
       using value_type = typename std::conditional<IsComplex, ComplexType, RealType>::type;
       using data_type = Eigen::Matrix<
         value_type,
@@ -224,7 +230,7 @@ namespace gearshifft
       {
         Eigen::internal::set_is_malloc_allowed(true); // enable eigen internal malloc
         // re-call constructor (can also add opts later here)
-        eigen_fft_ = fft_wrapper_type(Eigen::internal::fftw_impl<TPrecision>(),
+        eigen_fft_ = fft_wrapper_type(Eigen::default_fft_impl<TPrecision>(),
                                       fft_wrapper_type::HalfSpectrum);
         // Plan creation will happen in warmup rounds hopefully, todo: I think I can make this better
         // with some ugly tinkering so that plan creation actually happens here.
