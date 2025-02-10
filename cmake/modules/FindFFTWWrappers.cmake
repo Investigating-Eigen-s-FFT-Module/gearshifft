@@ -15,7 +15,7 @@
 #   FFTWWrappers_LIBRARY_DIR	   ... fftw library directory
 #
 # The following variables will be checked by the function
-#   FFTWWrappers_ROOT              ... if set, the libraries are exclusively searched
+#   FFTWWrappers_DIR              ... if set, the libraries are exclusively searched
 #                                      under this path
 #   MKL_DIR                       ... take the MKL libraries from here
 #
@@ -30,12 +30,12 @@ else()
   message("FFTWWrappers will prefer libraries with no prefix and no suffix")
 endif()
 
-# If environment variable FFTWWrappers_ROOT is defined, it has the same effect as the cmake variable
-if( NOT FFTWWrappers_ROOT AND DEFINED ENV{FFTWWrappers_ROOT} )
-  if( EXISTS "$ENV{FFTWWrappers_ROOT}/" )
-    set( FFTWWrappers_ROOT $ENV{FFTWWrappers_ROOT} )
+# If environment variable FFTWWrappers_DIR is defined, it has the same effect as the cmake variable
+if( NOT FFTWWrappers_DIR AND DEFINED ENV{FFTWWrappers_DIR} )
+  if( EXISTS "$ENV{FFTWWrappers_DIR}/" )
+    set( FFTWWrappers_DIR $ENV{FFTWWrappers_DIR} )
   else()
-    message( "FFTWWrappers_ROOT set to ${FFTWWrappers_ROOT}, but folder does not exist")
+    message( "FFTWWrappers_DIR set to ${FFTWWrappers_DIR}, but folder does not exist")
   endif()
 endif()
 
@@ -62,7 +62,7 @@ endif()
 find_library(
   FFTWWrappers_GNU_LIBRARIES
   NAMES ${PREFERENCE_LIBRARY_PREFIX}fftw3xc_gnu${PREFERENCE_LIBRARY_SUFFIX} fftw3xc_gnu
-  PATHS ${FFTWWrappers_ROOT}
+  PATHS ${FFTWWrappers_DIR}
   PATH_SUFFIXES "lib" "lib64"
   NO_DEFAULT_PATH
   )
@@ -85,7 +85,7 @@ endif()
 find_library(
   FFTWWrappers_INTEL_LIBRARIES
   NAMES ${PREFERENCE_LIBRARY_PREFIX}fftw3xc_intel${PREFERENCE_LIBRARY_SUFFIX} fftw3xc_intel
-  PATHS ${FFTWWrappers_ROOT}
+  PATHS ${FFTWWrappers_DIR}
   PATH_SUFFIXES "lib" "lib64"
   NO_DEFAULT_PATH
   )
@@ -108,7 +108,7 @@ endif()
 find_library(
   FFTWWrappers_MSVS_LIBRARIES
   NAMES fftw3xc_msvs
-  PATHS ${FFTWWrappers_ROOT}
+  PATHS ${FFTWWrappers_DIR}
   PATH_SUFFIXES "lib" "lib64"
   NO_DEFAULT_PATH
   )
