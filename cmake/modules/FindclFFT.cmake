@@ -11,15 +11,15 @@
 # It also defines the imported target clFFT::clFFT.
 #
 # If your clFFT installation is not in a standard installation directory, you
-# may provide a hint to where it may be found. Simply set the value CLFFT_ROOT
+# may provide a hint to where it may be found. Simply set the value CLFFT_DIR
 # to the directory containing 'include/clFFT.h" prior to calling this script.
 
-if(CLFFT_ROOT)
+if(CLFFT_DIR)
 
   find_path(CLFFT_ROOT_DIR
     NAMES include/clFFT.h
-    PATHS "${CLFFT_ROOT}"
-    PATHS ENV CLFFT_ROOT
+    PATHS "${CLFFT_DIR}"
+    PATHS ENV CLFFT_DIR
     DOC "clFFT root directory."
     NO_DEFAULT_PATH)
 

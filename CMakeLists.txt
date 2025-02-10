@@ -71,7 +71,7 @@ if(GEARSHIFFT_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS ON) # otherwise find libs automatically
   message(STATUS "Static linking with Boost system libraries may give linker problems. Enable GEARSHIFFT_SUPERBUILD_EXT_DOWNLOAD_Boost then (requires GEARSHIFFT_USE_SUPERBUILD).")
 endif()
-find_package(Boost 1.59 REQUIRED ${_QUIET} COMPONENTS
+find_package(Boost 1.59 CONFIG REQUIRED ${_QUIET} COMPONENTS
   system
   unit_test_framework
   program_options
@@ -184,7 +184,7 @@ endif()
 
 # CUDA+CUFFT
 if(GEARSHIFFT_BACKEND_CUFFT)
-  find_package(CUDA ${_QUIET}) # no imported targets, will be language in cmake >= 3.10
+  find_package(CUDA CONFIG ${_QUIET}) # no imported targets, will be language in cmake >= 3.10
   if(CUDA_FOUND)
 
     add_library(CUFFT INTERFACE)
@@ -237,7 +237,7 @@ endif()
 if(GEARSHIFFT_BACKEND_CLFFT)
   # get library from vcpkg install
   if(GEARSHIFFT_USE_VCPKG)
-    set(CLFFT_ROOT "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+    set(CLFFT_DIR "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
   endif()
 
   # can help to find opencl from nvidia
@@ -316,7 +316,7 @@ if(GEARSHIFFT_BACKEND_FFTW)
       message(WARNING "Most linux vcpkg triplets use static linkage yet FFTW_USE_STATIC_LIBS is not ON.
                        gearshifft::FFTW may not enable.")
     endif()
-    set(FFTW_ROOT "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+    set(FFTW_DIR "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
   endif()
 
   if(GEARSHIFFT_USE_STATIC_LIBS)
@@ -388,7 +388,12 @@ endif()
 # FFTW Wrappers of MKL
 #------------------------------------------------------------------------------
 
-if(GEARSHIFFT_BACKEND_FFTWWRAPPERS)
+if(GEARSHIFFT_BACKEND_FFTWWRAPPERS OR GEARSHIFFT_BACKEND_EIGEN)
+  # get library from vcpkg install
+  if(GEARSHIFFT_USE_VCPKG)
+    set(MKL_DIR "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+  endif()
+
   find_package(FFTWWrappers ${_QUIET})
   if(FFTWWrappers_FOUND) # found FFTWWrappers for GNU or Intel
 
@@ -502,37 +507,78 @@ if(GEARSHIFFT_BACKEND_ARMPL)
 endif()
 
 #------------------------------------------------------------------------------
-# Eigen FFT (Only with FFTW back-end for now)
+# Eigen FFT
 #------------------------------------------------------------------------------
 
 if(GEARSHIFFT_BACKEND_EIGEN)
-  if(NOT FFTW_FOUND)
-    message(WARNING "GEARSHIFFT_BACKEND_EIGEN is set to ON but FFTW could not be found.")
-  else()
-    find_package(Eigen3)
-
-    if(Eigen3_FOUND)
-      add_library(EIGEN INTERFACE)
-      add_library(gearshifft::EIGEN ALIAS EIGEN)
-
-      target_compile_definitions(EIGEN INTERFACE
-        EIGEN_ENABLED
-      )
-
-      target_link_libraries(EIGEN INTERFACE
-        Common
-        Eigen3::Eigen
-        FFTW # todo: when other back-ends are avaliable, make this one optional
-      )
+  find_package(Eigen3 ${_QUIET})
+  
+  if(Eigen3_FOUND)
+    add_library(EIGEN INTERFACE)
     
-      target_compile_options(EIGEN INTERFACE
+    target_link_libraries(EIGEN INTERFACE
+      Common
+      Eigen3::Eigen
+    )
+    target_compile_definitions(EIGEN INTERFACE
+      EIGEN_ENABLED
+    )
+    
+    # Eigen with KissFFT back-end
+    add_library(EIGEN_KISSFFT INTERFACE)
+    add_library(gearshifft::EIGEN_KISSFFT ALIAS EIGEN_KISSFFT)
+    target_link_libraries(EIGEN_KISSFFT INTERFACE
+      EIGEN
+    )
+    message(STATUS " gearshifft::EIGEN_KISSFFT enabled.")
+  
+    # Eigen with FFTW back-end
+    if(FFTW_FOUND)
+      add_library(EIGEN_FFTW INTERFACE)
+      add_library(gearshifft::EIGEN_FFTW ALIAS EIGEN_FFTW)
+      target_link_libraries(EIGEN_FFTW INTERFACE
+        EIGEN
+        FFTW
+      )
+      target_compile_options(EIGEN_FFTW INTERFACE
         -UFFTW_ENABLED # Undefine FFTW_ENABLED, linking against FFTW defines this
       )
+      target_compile_definitions(EIGEN_FFTW INTERFACE
+        EIGEN_FFTW_DEFAULT
+      )
+      message(STATUS " gearshifft::EIGEN_FFTW enabled.")
+    endif(FFTW_FOUND)
 
-      message(STATUS " gearshifft::EIGEN enabled.")
+    # # Eigen with MKL back-end
+    # add_library(EIGEN_MKL INTERFACE)
+    # add_library(gearshifft::EIGEN_MKL ALIAS EIGEN_MKL)
+    # target_link_libraries(EIGEN_MKL INTERFACE
+    #   EIGEN
+    #   FFTWWrappers
+    # )
+
+    # Eigen with PocketFFT back-end
+    if(GEARSHIFFT_USE_VCPKG)
+      set(POCKETFFT_DIR "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
     endif()
-  endif()
-endif()
+    find_package(PocketFFT ${_QUIET})
+
+    if(PocketFFT_FOUND)
+      add_library(EIGEN_POCKETFFT INTERFACE)
+      add_library(gearshifft::EIGEN_POCKETFFT ALIAS EIGEN_POCKETFFT)
+      target_link_libraries(EIGEN_POCKETFFT INTERFACE
+        EIGEN
+      )
+      target_compile_definitions(EIGEN_POCKETFFT INTERFACE
+        EIGEN_POCKETFFT_DEFAULT
+      )
+      target_include_directories(EIGEN_POCKETFFT INTERFACE
+        "${PocketFFT_INCLUDE_DIR}"
+      )
+      message(STATUS " gearshifft::EIGEN_POCKETFFT enabled.")
+    endif(PocketFFT_FOUND)
+  endif(Eigen3_FOUND)
+endif(GEARSHIFFT_BACKEND_EIGEN)
 
 #-------------------------------------------------------------------------------
 

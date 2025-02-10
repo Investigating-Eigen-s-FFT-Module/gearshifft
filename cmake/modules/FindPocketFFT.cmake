@@ -6,14 +6,14 @@
 #  PocketFFT_INCLUDE_DIR  - The PocketFFT include directory
 #
 # The following variables can be set as arguments:
-#  POCKETFFT_ROOT         - Root directory to search for PocketFFT (overrides default search)
+#  POCKETFFT_DIR         - Root directory to search for PocketFFT (overrides default search)
 
-# Default search paths if POCKETFFT_ROOT is not set
-if(POCKETFFT_ROOT)
+# Default search paths if POCKETFFT_DIR is not set
+if(POCKETFFT_DIR)
   find_path(POCKETFFT_ROOT_DIR
     NAMES "include/pocketfft_hdronly.h"
-    PATHS "${POCKETFFT_ROOT}"
-    PATHS ENV POCKETFFT_ROOT
+    PATHS "${POCKETFFT_DIR}"
+    PATHS ENV POCKETFFT_DIR
     DOC "PocketFFT root directory."
     NO_DEFAULT_PATH)
 else()

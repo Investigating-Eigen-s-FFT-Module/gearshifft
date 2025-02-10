@@ -1,6 +1,6 @@
 # This module only handles the ESSL SMP library and the FFTW3-style wrapper.
 
-set(ESSL_ROOT "/opt/ibmmath/essl/6.2")
+set(ESSL_DIR "/opt/ibmmath/essl/6.2")
 
 #------------------------------------------------------------------------------
 # Find ESSL libraries
@@ -10,7 +10,7 @@ set(ESSL_ROOT "/opt/ibmmath/essl/6.2")
 find_library(
   ESSL_SMP
   NAMES libesslsmp.so
-  PATHS ${ESSL_ROOT}
+  PATHS ${ESSL_DIR}
   PATH_SUFFIXES "lib64" "lib"
   NO_DEFAULT_PATHS
 )
@@ -19,7 +19,7 @@ find_library(
 find_path(
   ESSL_BASE_INCLUDE_DIR
   NAMES "essl.h"
-  PATHS ${ESSL_ROOT}
+  PATHS ${ESSL_DIR}
   PATH_SUFFIXES "include"
   NO_DEFAULT_PATHS
 )
@@ -32,7 +32,7 @@ find_path(
 find_library(
   ESSL_FFTW
   NAMES libfftw3_essl.a
-  PATHS ${ESSL_ROOT}
+  PATHS ${ESSL_DIR}
   PATH_SUFFIXES "lib64" "lib"
   NO_DEFAULT_PATHS
 )
@@ -41,7 +41,7 @@ find_library(
 find_path(
   ESSL_FFTW_INCLUDE_DIR
   NAMES "fftw3_essl.h"
-  PATHS ${ESSL_ROOT}
+  PATHS ${ESSL_DIR}
   PATH_SUFFIXES "include"
   NO_DEFAULT_PATHS
 )
