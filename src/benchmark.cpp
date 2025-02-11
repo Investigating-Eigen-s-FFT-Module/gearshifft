@@ -59,13 +59,10 @@ using FFT_Is_Normalized = std::false_type;
 
 using namespace gearshifft::eigen;
 using Context           = EigenContext;
-using FFTs              = List</* Inplace_Real, */
-                              /* Inplace_Complex, */ // not possible with Eigen API (resize calls for half spectrum stuff on dst breaks it)
-                               Outplace_Real,
+using FFTs              = List<Outplace_Real,
                                Outplace_Complex >;
 using Precisions        = List<float, double>;
-using FFT_Is_Normalized = std::true_type; // todo: I believe this is the case by default but
-                                          // it can be changed too?
+using FFT_Is_Normalized = std::true_type;
 #endif
 
 // ----------------------------------------------------------------------------
@@ -80,8 +77,14 @@ int main( int argc, char* argv[] )
     gearshifft::Benchmark<Context> benchmark;
 
     benchmark.configure(argc, argv);
+    #ifdef EIGEN_ENABLED // Eigen allows scaling decision at run-time. todo: maybe refactor so this is less hacky
+    if(Context::options().is_normalized())
+      ret = benchmark.run<std::true_type, FFTs, Precisions>();
+    else
+      ret = benchmark.run<std::false_type, FFTs, Precisions>();
+    #else
     ret = benchmark.run<FFT_Is_Normalized, FFTs, Precisions>();
-
+    #endif
   }catch(const std::runtime_error& e){
     std::cerr << e.what() << std::endl;
     return 1;

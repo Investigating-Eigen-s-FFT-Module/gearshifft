@@ -47,8 +47,35 @@ namespace gearshifft
     {
       public:
         EigenOptions() : OptionsDefault() {
+          add_options()
+          ("scaling", value(&scaling_)->default_value("scaled"), "Normalize output (scaled/unscaled).")
+          ("spectrum", value(&spectrum_)->default_value("full"), "Half or Full Spectrum on real fft/ifft (full/half).");
+        };
+        
+        int flags() const {
+          int flags = 0;
+          if(scaling_ == "unscaled")
+            flags |= 1;
+          if(spectrum_ == "half")
+            flags |= 2;
+          return flags;
+        }
 
-        }; // todo: add flags as options
+        bool is_normalized() {
+          return (scaling_ == "scaled");
+        }
+        
+        std::string scaling() {
+          return scaling_;
+        }
+
+        std::string spectrum() {
+          return spectrum_;
+        }
+
+      private:
+        std::string scaling_;
+        std::string spectrum_;
     };
 
     namespace traits
@@ -88,10 +115,12 @@ namespace gearshifft
       std::string get_used_device_properties()
       {
         std::ostringstream msg;
-        // todo: change in case multithread is allowed with some backend
+        // todo: change in case multithread is allowed with some backend (it likely is)
         msg << "\"SupportedThreads\"," << 1
             << ",\"UsedThreads\"," << 1
-            << ",\"TotalMemory\"," << getMemorySize();
+            << ",\"TotalMemory\"," << getMemorySize()
+            << ",\"Scaling\"," << options().scaling()
+            << ",\"Spectrum\"," << options().spectrum();
 
         return msg.str();
       }
@@ -99,7 +128,7 @@ namespace gearshifft
 
     template <typename TFFT,       // see fft.hpp (FFT_Inplace_Real, ...)
               typename TPrecision, // foat, double
-              size_t NDim          // overriden to 1, 2 and 3D not allowed (todo: some way to skip thosee)
+              size_t NDim          // overriden to 1, 2 and 3D not allowed (todo: some way to skip those?)
               >
     struct EigenImpl
     {
@@ -107,7 +136,6 @@ namespace gearshifft
       // COMPILE TIME FIELDS
 
       using Extent = std::array<std::size_t, NDim>;
-      // todo: Eigen with FFTW backend only does ESTIMATE as of now!
       using ComplexType = typename traits::plan<TPrecision>::ComplexType;
       using RealType = typename traits::plan<TPrecision>::RealType;
       #if NDim != 1
@@ -117,7 +145,6 @@ namespace gearshifft
 
       static constexpr bool IsComplex = TFFT::IsComplex;
 
-      // todo: missing options: FFT(Flag flags = Default)
       using fft_wrapper_type = typename Eigen::FFT<TPrecision>;
       using value_type = typename std::conditional<IsComplex, ComplexType, RealType>::type;
       using data_type = Eigen::Matrix<
@@ -150,6 +177,7 @@ namespace gearshifft
       size_t data_complex_size_ = 0;
 
       fft_wrapper_type eigen_fft_;
+      int eigen_fft_flags_ = EigenContext::options().flags();
 
       EigenImpl(const Extent &cextents)
       {
@@ -229,9 +257,9 @@ namespace gearshifft
       void init_forward()
       {
         Eigen::internal::set_is_malloc_allowed(true); // enable eigen internal malloc
-        // re-call constructor (can also add opts later here)
+        // re-call constructor
         eigen_fft_ = fft_wrapper_type(Eigen::default_fft_impl<TPrecision>(),
-                                      fft_wrapper_type::HalfSpectrum);
+                                      eigen_fft_flags_);
         // Plan creation will happen in warmup rounds hopefully, todo: I think I can make this better
         // with some ugly tinkering so that plan creation actually happens here.
       }
@@ -262,8 +290,6 @@ namespace gearshifft
       {
         static_assert(std::is_same<THostData,value_type>::value
                       && "upload(THostData *input) gave mismatched value type.");
-        // Todo: this will probably break with more than 1D Matrices and/or outer stride
-        //       once that is an option
         std::memcpy(data_->data(), input, data_size_ * sizeof(value_type));
       }
 
@@ -278,12 +304,11 @@ namespace gearshifft
     };
 
     // InPlace not possible through Eigen API
-
     // Note: for uneven sizes, this will create mismatch as the Eigen API
-    //       sets the output size for a complex to real ifft to (2 * (src.size()-1))
-    //       as opposed to just reading dst.size(). It never assumes that dst.size()
-    //       has been set, which is where this guesswork is from.
-    //       todo: somehow skip radix357 runs  on this instantiation?
+    // sets the output size for a complex to real ifft to (2 * (src.size()-1))
+    // as opposed to just reading dst.size(). It never assumes that dst.size()
+    // has been set, which is where this guesswork is from.
+    // (todo): somehow skip those runs on this instantiation or at least add a warning?
     using Outplace_Real = gearshifft::FFT<FFT_Outplace_Real,
                                           FFT_Plan_Not_Reusable,
                                           EigenImpl,
