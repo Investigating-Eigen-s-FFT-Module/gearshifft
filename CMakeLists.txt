@@ -388,12 +388,7 @@ endif()
 # FFTW Wrappers of MKL
 #------------------------------------------------------------------------------
 
-if(GEARSHIFFT_BACKEND_FFTWWRAPPERS OR GEARSHIFFT_BACKEND_EIGEN)
-  # get library from vcpkg install
-  if(GEARSHIFFT_USE_VCPKG)
-    set(MKL_DIR "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
-  endif()
-
+if(GEARSHIFFT_BACKEND_FFTWWRAPPERS)
   find_package(FFTWWrappers ${_QUIET})
   if(FFTWWrappers_FOUND) # found FFTWWrappers for GNU or Intel
 
@@ -549,13 +544,31 @@ if(GEARSHIFFT_BACKEND_EIGEN)
       message(STATUS " gearshifft::EIGEN_FFTW enabled.")
     endif(FFTW_FOUND)
 
-    # # Eigen with MKL back-end
-    # add_library(EIGEN_MKL INTERFACE)
-    # add_library(gearshifft::EIGEN_MKL ALIAS EIGEN_MKL)
-    # target_link_libraries(EIGEN_MKL INTERFACE
-    #   EIGEN
-    #   FFTWWrappers
-    # )
+    # Eigen with MKL back-end
+    set(ENABLE_CDFT ON)             # options for MKL find_package
+    set(MKL_THREADING "gnu_thread") # todo: is this correct for all cases (instead of intel_thread)
+    find_package(MKL CONFIG ${_QUIET})
+    
+    if(MKL_FOUND)
+      add_library(EIGEN_MKL INTERFACE)
+      add_library(gearshifft::EIGEN_MKL ALIAS EIGEN_MKL)
+      target_link_libraries(EIGEN_MKL INTERFACE
+        EIGEN
+        MKL::MKL_CDFT
+      )
+      get_target_property(_mkl_compile_opts MKL::MKL INTERFACE_COMPILE_DEFINITIONS)
+      if(_mkl_compile_opts)
+        target_compile_definitions(EIGEN_MKL INTERFACE
+          EIGEN_MKL_DEFAULT
+          ${_mkl_compile_opts}
+        )
+      else()
+        target_compile_definitions(EIGEN_MKL INTERFACE
+          EIGEN_MKL_DEFAULT
+        )
+      endif()
+      message(STATUS " gearshifft::EIGEN_MKL enabled.")
+    endif(MKL_FOUND)
 
     # Eigen with PocketFFT back-end
     if(GEARSHIFFT_USE_VCPKG)

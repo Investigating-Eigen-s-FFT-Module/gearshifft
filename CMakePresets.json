@@ -19,7 +19,8 @@
         "BUILD_TESTING": "ON",
         "GEARSHIFFT_TESTS_ADD_CPU_ONLY": "ON",
         "GEARSHIFFT_USE_VCPKG": "ON",
-        "FFTW_USE_STATIC_LIBS": "ON"
+        "FFTW_USE_STATIC_LIBS": "ON",
+        "MKL_DIR": "$env{HOME}/intel/oneapi/mkl/2025.0/lib/cmake/mkl"
       }
     },
     {

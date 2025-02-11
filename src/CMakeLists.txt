@@ -30,7 +30,7 @@ gearshifft_add_executable(gearshifft_clfft gearshifft::CLFFT)
 gearshifft_add_executable(gearshifft_fftw gearshifft::FFTW)
 gearshifft_add_executable(gearshifft_eigen_kissfft gearshifft::EIGEN_KISSFFT)
 gearshifft_add_executable(gearshifft_eigen_fftw gearshifft::EIGEN_FFTW)
-# gearshifft_add_executable(gearshifft_eigen_mkl gearshifft::EIGEN_MKL) todo: get this working
+gearshifft_add_executable(gearshifft_eigen_mkl gearshifft::EIGEN_MKL)
 gearshifft_add_executable(gearshifft_eigen_pocketfft gearshifft::EIGEN_POCKETFFT)
 gearshifft_add_executable(gearshifft_fftwwrappers gearshifft::FFTWWrappers)
 gearshifft_add_executable(gearshifft_rocfft gearshifft::ROCFFT)
