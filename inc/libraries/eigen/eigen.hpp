@@ -33,6 +33,7 @@
 #define TITLE "eigen-fftw"
 #elif defined EIGEN_MKL_DEFAULT
 #define TITLE "eigen-mkl"
+#include <mkl.h>
 #elif defined EIGEN_POCKETFFT_DEFAULT
 #define TITLE "eigen-pocketfft"
 #else
@@ -104,20 +105,32 @@ namespace gearshifft
 
       static std::string get_device_list()
       {
-        // todo: update for multithread support
         std::ostringstream msg;
-
+        #ifdef EIGEN_MKL_DEFAULT
+        msg << std::thread::hardware_concurrency() << " CPU threads supported.\n";
+        #else
         msg << "Only single thread CPU supported.\n";
+        #endif
 
         return msg.str();
       }
 
       std::string get_used_device_properties()
       {
+        #ifdef EIGEN_MKL_DEFAULT
+        size_t maxndevs = std::thread::hardware_concurrency();
+        size_t ndevs = options().getNumberDevices();
+        if(maxndevs == 0)
+          maxndevs = 1;
+        if(ndevs == 0 || ndevs > maxndevs)
+          ndevs = maxndevs;
+        #else
+        size_t maxndevs = 1;
+        size_t ndevs = 1;
+        #endif
         std::ostringstream msg;
-        // todo: change in case multithread is allowed with some backend (it likely is)
-        msg << "\"SupportedThreads\"," << 1
-            << ",\"UsedThreads\"," << 1
+        msg << "\"SupportedThreads\"," << maxndevs
+            << ",\"UsedThreads\"," << ndevs
             << ",\"TotalMemory\"," << getMemorySize()
             << ",\"Scaling\"," << options().scaling()
             << ",\"Spectrum\"," << options().spectrum();
@@ -181,6 +194,10 @@ namespace gearshifft
 
       EigenImpl(const Extent &cextents)
       {
+        #ifdef EIGEN_MKL_DEFAULT
+        // NOTE: according to doc, the number serves as a hint and MKL may opt to use less!
+        mkl_set_num_threads(EigenContext::options().getNumberDevices());
+        #endif
         Eigen::internal::set_is_malloc_allowed(false); // disable eigen internal malloc
         
         extents_ = interpret_as::column_major(cextents);
@@ -303,9 +320,11 @@ namespace gearshifft
       }
     };
 
-    // InPlace not possible through Eigen API
-    // Note: for uneven sizes, this will create mismatch as the Eigen API
-    // sets the output size for a complex to real ifft to (2 * (src.size()-1))
+    // InPlace not possible through Eigen API, or at least only with hacky ways
+    // using Eigen::Map and specific parameters on some back-ends.
+    // Note: for uneven sizes, when half spectrum is enabled,
+    // this will create mismatch as the Eigen API sets the output size
+    // for a complex to real ifft to (2 * (src.size()-1))
     // as opposed to just reading dst.size(). It never assumes that dst.size()
     // has been set, which is where this guesswork is from.
     // (todo): somehow skip those runs on this instantiation or at least add a warning?
