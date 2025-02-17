@@ -371,7 +371,8 @@ if(GEARSHIFFT_BACKEND_FFTW)
       target_include_directories(FFTW INTERFACE ${FFTW_INCLUDE_DIR})
       target_compile_definitions(FFTW INTERFACE
         FFTW_ENABLED
-        GEARSHIFFT_BACKEND_FFTW_THREADS=${GEARSHIFFT_BACKEND_FFTW_THREADS})
+        GEARSHIFFT_BACKEND_FFTW_THREADS=${GEARSHIFFT_BACKEND_FFTW_THREADS}
+        GEARSHIFFT_BACKEND_FFTW_OPENMP=${GEARSHIFFT_BACKEND_FFTW_OPENMP})
       target_link_libraries(FFTW INTERFACE
         Common
         $<$<STREQUAL:${GEARSHIFFT_BACKEND_FFTW_OPENMP},ON>:${FFTW_OPENMP_LIBS}>
@@ -546,7 +547,7 @@ if(GEARSHIFFT_BACKEND_EIGEN)
 
     # Eigen with MKL back-end
     set(ENABLE_CDFT ON)             # options for MKL find_package
-    set(MKL_THREADING "gnu_thread") # todo: is this correct for all cases (instead of intel_thread)
+    set(MKL_THREADING "gnu_thread") # todo: make this smarter to support intel compiler as options. Should also update eigen.hpp msg's
     find_package(MKL CONFIG ${_QUIET})
     
     if(MKL_FOUND)

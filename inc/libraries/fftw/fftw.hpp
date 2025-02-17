@@ -25,6 +25,10 @@
 #include <fftw3.h>
 #endif
 
+#ifdef GEARSHIFFT_BACKEND_FFTW_OPENMP
+#include <omp.h>
+#endif
+
 namespace gearshifft {
 namespace fftw {
 
@@ -605,6 +609,9 @@ namespace fftw {
         }
 
 #if defined(GEARSHIFFT_BACKEND_FFTW_THREADS) && GEARSHIFFT_BACKEND_FFTW_THREADS==1
+        #ifdef GEARSHIFFT_BACKEND_FFTW_OPENMP
+                omp_set_num_threads(FftwContext::options().getNumberDevices());
+        #endif
         if( traits::thread_api<TPrecision>::init_threads()==0 )
           throw std::runtime_error("fftw thread initialization failed.");
 
