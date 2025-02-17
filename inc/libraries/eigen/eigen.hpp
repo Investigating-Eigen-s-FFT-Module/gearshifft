@@ -320,7 +320,8 @@ namespace gearshifft
       }
     };
 
-    // InPlace not possible through Eigen API, or at least only with hacky ways
+    // Inplace not possible with half spectrum enabled; since that flag is set
+    // at run-time, I'll omit it for now. (todo): maybe add inplace complex later.
     // using Eigen::Map and specific parameters on some back-ends.
     // Note: for uneven sizes, when half spectrum is enabled,
     // this will create mismatch as the Eigen API sets the output size
