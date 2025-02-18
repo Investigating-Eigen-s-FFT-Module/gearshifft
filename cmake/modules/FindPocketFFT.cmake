@@ -8,30 +8,28 @@
 # The following variables can be set as arguments:
 #  POCKETFFT_DIR         - Root directory to search for PocketFFT (overrides default search)
 
-# Default search paths if POCKETFFT_DIR is not set
 if(POCKETFFT_DIR)
-  find_path(POCKETFFT_ROOT_DIR
-    NAMES "include/pocketfft_hdronly.h"
+
+  find_path(PocketFFT_INCLUDE_DIR
+    NAMES "pocketfft_hdronly.h"
     PATHS "${POCKETFFT_DIR}"
     PATHS ENV POCKETFFT_DIR
-    DOC "PocketFFT root directory."
-    NO_DEFAULT_PATH)
-else()
-  find_path(POCKETFFT_ROOT_DIR
-    NAMES "include/pocketfft_hdronly.h"
-    DOC "PocketFFT root directory.")
-endif()
-
-# Find header
-find_path(PocketFFT_INCLUDE_DIR
-  NAMES "pocketfft_hdronly.h"
-  PATHS "${POCKETFFT_ROOT_DIR}"
-  PATH_SUFFIXES
+    PATH_SUFFIXES
     "include"
     "include/pocketfft"
-  DOC "PocketFFT include directory"
-  NO_DEFAULT_PATH
-)
+    DOC "PocketFFT root directory."
+    NO_DEFAULT_PATH)
+
+else()
+  # Default search paths if POCKETFFT_DIR is not set
+  find_path(PocketFFT_INCLUDE_DIR
+    NAMES "pocketfft_hdronly.h"
+    PATH_SUFFIXES
+    "include"
+    "include/pocketfft"
+    DOC "PocketFFT root directory.")
+
+endif(POCKETFFT_DIR)
 
 # Handle QUIET and REQUIRED arguments
 include(FindPackageHandleStandardArgs)
@@ -48,5 +46,4 @@ endif()
 # Advanced variables shouldn't show up in GUI by default
 mark_as_advanced(
   PocketFFT_INCLUDE_DIR
-  POCKETFFT_ROOT_DIR
 )

@@ -11,6 +11,7 @@
         "openmp"
       ]
     },
-    "half"
+    "half",
+    "pocketfft"
   ]
 }
