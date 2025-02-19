@@ -6,6 +6,7 @@ option(GEARSHIFFT_VERBOSE "Verbose output during build generation." OFF)
 option(GEARSHIFFT_USE_STATIC_LIBS "Force static linking Boost and FFTW (use libraries' cmake variables otherwise)." OFF)
 option(GEARSHIFFT_TESTS_ADD_CPU_ONLY "Only add tests which run on CPU." OFF)
 option(GEARSHIFFT_FLUSH_CACHE "Attempt to flush the cache before each plan and execution step. (Experimental)" OFF)
+option(GEARSHIFFT_USE_VCPKG "Try to get back-ends through vcpkg where applicable." OFF)
 
 set(GEARSHIFFT_CXX11_ABI "1" CACHE STRING "Enable _GLIBCXX_USE_CXX11_ABI in GCC 5.0+")
 set_property(CACHE GEARSHIFFT_CXX11_ABI PROPERTY STRINGS "0;1")
@@ -25,7 +26,10 @@ cmake_dependent_option(
 option(GEARSHIFFT_BACKEND_FFTWWRAPPERS  "Compile gearshifft_fftwwrappers if possible" ON)
 option(GEARSHIFFT_BACKEND_ESSL "Compile gearshifft_esslfftw if possible" ON)
 option(GEARSHIFFT_BACKEND_ARMPL "Compile gearshifft_armplfftw if possible" ON)
-
+cmake_dependent_option(
+  GEARSHIFFT_BACKEND_EIGEN "Compile gearshifft_eigen  if possible" ON
+  "GEARSHIFFT_BACKEND_FFTW" ON)
+ 
 # backend-disabler
 
 option(GEARSHIFFT_BACKEND_ROCFFT_ONLY "Disable all other backends" OFF)

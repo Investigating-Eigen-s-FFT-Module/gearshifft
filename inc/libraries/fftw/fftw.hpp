@@ -25,6 +25,10 @@
 #include <fftw3.h>
 #endif
 
+#ifdef GEARSHIFFT_BACKEND_FFTW_OPENMP
+#include <omp.h>
+#endif
+
 namespace gearshifft {
 namespace fftw {
 
@@ -524,7 +528,7 @@ namespace fftw {
    * This class handles:
    * - {1D, 2D, 3D} x {R2C, C2R, C2C} x {inplace, outplace} x {float, double}.
    */
-  template<typename TFFT, // see fft_abstract.hpp (FFT_Inplace_Real, ...)
+  template<typename TFFT, // see fft.hpp (FFT_Inplace_Real, ...)
            typename TPrecision, // double, float
            size_t   NDim // 1..3
            >
@@ -605,6 +609,9 @@ namespace fftw {
         }
 
 #if defined(GEARSHIFFT_BACKEND_FFTW_THREADS) && GEARSHIFFT_BACKEND_FFTW_THREADS==1
+        #ifdef GEARSHIFFT_BACKEND_FFTW_OPENMP
+                omp_set_num_threads(FftwContext::options().getNumberDevices());
+        #endif
         if( traits::thread_api<TPrecision>::init_threads()==0 )
           throw std::runtime_error("fftw thread initialization failed.");
 

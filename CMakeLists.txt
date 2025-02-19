@@ -71,7 +71,7 @@ if(GEARSHIFFT_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS ON) # otherwise find libs automatically
   message(STATUS "Static linking with Boost system libraries may give linker problems. Enable GEARSHIFFT_SUPERBUILD_EXT_DOWNLOAD_Boost then (requires GEARSHIFFT_USE_SUPERBUILD).")
 endif()
-find_package(Boost 1.59 REQUIRED ${_QUIET} COMPONENTS
+find_package(Boost 1.59 CONFIG REQUIRED ${_QUIET} COMPONENTS
   system
   unit_test_framework
   program_options
@@ -91,7 +91,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 # TODO: in cmake 3.8+ use target_compile_features(myTarget PUBLIC cxx_std_11)
@@ -184,7 +184,7 @@ endif()
 
 # CUDA+CUFFT
 if(GEARSHIFFT_BACKEND_CUFFT)
-  find_package(CUDA ${_QUIET}) # no imported targets, will be language in cmake >= 3.10
+  find_package(CUDA CONFIG ${_QUIET}) # no imported targets, will be language in cmake >= 3.10
   if(CUDA_FOUND)
 
     add_library(CUFFT INTERFACE)
@@ -235,6 +235,11 @@ endif()
 #------------------------------------------------------------------------------
 
 if(GEARSHIFFT_BACKEND_CLFFT)
+  # get library from vcpkg install
+  if(GEARSHIFFT_USE_VCPKG)
+    set(CLFFT_DIR "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+  endif()
+
   # can help to find opencl from nvidia
   if(GEARSHIFFT_BACKEND_CUFFT AND NOT ENV{CUDA_PATH})
     set(ENV{CUDA_PATH} ${CUDA_TOOLKIT_ROOT_DIR})
@@ -305,6 +310,15 @@ endif()
 #------------------------------------------------------------------------------
 
 if(GEARSHIFFT_BACKEND_FFTW)
+  # get library from vcpkg install
+  if(GEARSHIFFT_USE_VCPKG)
+    if(NOT FFTW_USE_STATIC_LIBS)
+      message(WARNING "Most linux vcpkg triplets use static linkage yet FFTW_USE_STATIC_LIBS is not ON.
+                       gearshifft::FFTW may not enable.")
+    endif()
+    set(FFTW_DIR "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+  endif()
+
   if(GEARSHIFFT_USE_STATIC_LIBS)
     set(FFTW_USE_STATIC_LIBS ON) # otherwise find libs automatically
   endif()
@@ -357,7 +371,8 @@ if(GEARSHIFFT_BACKEND_FFTW)
       target_include_directories(FFTW INTERFACE ${FFTW_INCLUDE_DIR})
       target_compile_definitions(FFTW INTERFACE
         FFTW_ENABLED
-        GEARSHIFFT_BACKEND_FFTW_THREADS=${GEARSHIFFT_BACKEND_FFTW_THREADS})
+        GEARSHIFFT_BACKEND_FFTW_THREADS=${GEARSHIFFT_BACKEND_FFTW_THREADS}
+        GEARSHIFFT_BACKEND_FFTW_OPENMP=${GEARSHIFFT_BACKEND_FFTW_OPENMP})
       target_link_libraries(FFTW INTERFACE
         Common
         $<$<STREQUAL:${GEARSHIFFT_BACKEND_FFTW_OPENMP},ON>:${FFTW_OPENMP_LIBS}>
@@ -487,6 +502,98 @@ if(GEARSHIFFT_BACKEND_ARMPL)
 
 endif()
 
+#------------------------------------------------------------------------------
+# Eigen FFT
+#------------------------------------------------------------------------------
+
+if(GEARSHIFFT_BACKEND_EIGEN)
+  find_package(Eigen3 ${_QUIET})
+  
+  if(Eigen3_FOUND)
+    add_library(EIGEN INTERFACE)
+    
+    target_link_libraries(EIGEN INTERFACE
+      Common
+      Eigen3::Eigen
+    )
+    target_compile_definitions(EIGEN INTERFACE
+      EIGEN_ENABLED
+    )
+    
+    # Eigen with KissFFT back-end
+    add_library(EIGEN_KISSFFT INTERFACE)
+    add_library(gearshifft::EIGEN_KISSFFT ALIAS EIGEN_KISSFFT)
+    target_link_libraries(EIGEN_KISSFFT INTERFACE
+      EIGEN
+    )
+    message(STATUS " gearshifft::EIGEN_KISSFFT enabled.")
+  
+    # Eigen with FFTW back-end
+    if(FFTW_FOUND)
+      add_library(EIGEN_FFTW INTERFACE)
+      add_library(gearshifft::EIGEN_FFTW ALIAS EIGEN_FFTW)
+      target_link_libraries(EIGEN_FFTW INTERFACE
+        EIGEN
+        FFTW
+      )
+      target_compile_options(EIGEN_FFTW INTERFACE
+        -UFFTW_ENABLED # Undefine FFTW_ENABLED, linking against FFTW defines this
+      )
+      target_compile_definitions(EIGEN_FFTW INTERFACE
+        EIGEN_FFTW_DEFAULT
+      )
+      message(STATUS " gearshifft::EIGEN_FFTW enabled.")
+    endif(FFTW_FOUND)
+
+    # Eigen with MKL back-end
+    set(ENABLE_CDFT ON)             # options for MKL find_package
+    set(MKL_THREADING "gnu_thread") # todo: make this smarter to support intel compiler as options. Should also update eigen.hpp msg's
+    find_package(MKL CONFIG ${_QUIET})
+    
+    if(MKL_FOUND)
+      add_library(EIGEN_MKL INTERFACE)
+      add_library(gearshifft::EIGEN_MKL ALIAS EIGEN_MKL)
+      target_link_libraries(EIGEN_MKL INTERFACE
+        EIGEN
+        MKL::MKL_CDFT
+      )
+      get_target_property(_mkl_compile_opts MKL::MKL INTERFACE_COMPILE_DEFINITIONS)
+      if(_mkl_compile_opts)
+        target_compile_definitions(EIGEN_MKL INTERFACE
+          EIGEN_MKL_DEFAULT
+          ${_mkl_compile_opts}
+        )
+      else()
+        target_compile_definitions(EIGEN_MKL INTERFACE
+          EIGEN_MKL_DEFAULT
+        )
+      endif()
+      message(STATUS " gearshifft::EIGEN_MKL enabled.")
+    endif(MKL_FOUND)
+
+    # Eigen with PocketFFT back-end
+    if(GEARSHIFFT_USE_VCPKG)
+      set(POCKETFFT_DIR "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+    endif()
+    find_package(PocketFFT ${_QUIET})
+
+    if(PocketFFT_FOUND)
+      add_library(EIGEN_POCKETFFT INTERFACE)
+      add_library(gearshifft::EIGEN_POCKETFFT ALIAS EIGEN_POCKETFFT)
+      target_link_libraries(EIGEN_POCKETFFT INTERFACE
+        EIGEN
+      )
+      target_compile_definitions(EIGEN_POCKETFFT INTERFACE
+        EIGEN_POCKETFFT_DEFAULT
+      )
+      target_include_directories(EIGEN_POCKETFFT INTERFACE
+        "${PocketFFT_INCLUDE_DIR}"
+      )
+      message(STATUS " gearshifft::EIGEN_POCKETFFT enabled.")
+    endif(PocketFFT_FOUND)
+  endif(Eigen3_FOUND)
+endif(GEARSHIFFT_BACKEND_EIGEN)
+
 #-------------------------------------------------------------------------------
 
 if(NOT TARGET gearshifft::CUFFT
@@ -496,6 +603,7 @@ if(NOT TARGET gearshifft::CUFFT
     AND NOT TARGET gearshifft::ROCFFT
     AND NOT TARGET gearshifft::ESSL
     AND NOT TARGET gearshifft::ARMPL
+    AND NOT TARGET gearshifft::EIGEN
     )
   message(WARNING "No FFT backend found.")
 endif()

@@ -54,6 +54,15 @@ using FFTs              = List<Inplace_Real,
                                Outplace_Complex >;
 using Precisions        = List<float, double>;
 using FFT_Is_Normalized = std::false_type;
+#elif defined(EIGEN_ENABLED)
+#include "libraries/eigen/eigen.hpp"
+
+using namespace gearshifft::eigen;
+using Context           = EigenContext;
+using FFTs              = List<Outplace_Real,
+                               Outplace_Complex >;
+using Precisions        = List<float, double>;
+using FFT_Is_Normalized = std::true_type;
 #endif
 
 // ----------------------------------------------------------------------------
@@ -68,8 +77,14 @@ int main( int argc, char* argv[] )
     gearshifft::Benchmark<Context> benchmark;
 
     benchmark.configure(argc, argv);
+    #ifdef EIGEN_ENABLED // Eigen allows scaling decision at run-time. todo: maybe refactor so this is less hacky
+    if(Context::options().is_normalized())
+      ret = benchmark.run<std::true_type, FFTs, Precisions>();
+    else
+      ret = benchmark.run<std::false_type, FFTs, Precisions>();
+    #else
     ret = benchmark.run<FFT_Is_Normalized, FFTs, Precisions>();
-
+    #endif
   }catch(const std::runtime_error& e){
     std::cerr << e.what() << std::endl;
     return 1;

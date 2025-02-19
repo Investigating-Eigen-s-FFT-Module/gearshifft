@@ -1,0 +1,49 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Kitware/CMake/refs/tags/v3.31.5/Help/manual/presets/schema.json",
+  "version": 10,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 31,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "vcpkg",
+      "hidden": true,
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "/usr/bin/make",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "YES",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "BUILD_TESTING": "ON",
+        "GEARSHIFFT_TESTS_ADD_CPU_ONLY": "ON",
+        "GEARSHIFFT_USE_VCPKG": "ON",
+        "FFTW_USE_STATIC_LIBS": "ON",
+        "MKL_DIR": "$env{HOME}/intel/oneapi/mkl/2025.0/lib/cmake/mkl"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "vcpkg",
+      "description": "Release build using GCC and make",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-linux-release",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "debug",
+      "inherits": "vcpkg",
+      "description": "Debug build using GCC and make",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-linux",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    }
+  ]
+}

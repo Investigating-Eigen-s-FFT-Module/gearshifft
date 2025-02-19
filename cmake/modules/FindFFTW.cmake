@@ -15,13 +15,13 @@
 #
 # The following variables will be checked by the function
 #   FFTW_USE_STATIC_LIBS    ... if true, only static libraries are found
-#   FFTW_ROOT               ... if set, the libraries are exclusively searched
+#   FFTW_DIR               ... if set, the libraries are exclusively searched
 #                               under this path
 #   FFTW_LIBRARY            ... fftw library to use
 #   FFTW_INCLUDE_DIR        ... fftw include directory
 #   FFTW_VERBOSE_FIND       ... print extra messages
 #
-# Besides these command line defines, the environment is searched for FFTWDIR and FFTW_ROOT to be filled
+# Besides these command line defines, the environment is searched for FFTWDIR and FFTW_DIR to be filled
 # if these variables are defined, it's assumed that they point to the FFTW installation root path
 
 
@@ -58,13 +58,13 @@ foreach(_COMPONENT IN LISTS FFTW_FIND_COMPONENTS)
   endif()
 endforeach()
 
-#If environment variable FFTWDIR is specified, it has same effect as FFTW_ROOT
-if( NOT FFTW_ROOT AND (DEFINED ENV{FFTWDIR} OR DEFINED ENV{FFTW_ROOT}))
+#If environment variable FFTWDIR is specified, it has same effect as FFTW_DIR
+if( NOT FFTW_DIR AND (DEFINED ENV{FFTWDIR} OR DEFINED ENV{FFTW_DIR}))
   if(EXISTS "$ENV{FFTWDIR}/")                                          
-    set( FFTW_ROOT $ENV{FFTWDIR} )                                     
+    set( FFTW_DIR $ENV{FFTWDIR} )                                     
   endif()                                                              
-  if( EXISTS "$ENV{FFTW_ROOT}/" )                                      
-    set( FFTW_ROOT $ENV{FFTW_ROOT} )                                   
+  if( EXISTS "$ENV{FFTW_DIR}/" )                                      
+    set( FFTW_DIR $ENV{FFTW_DIR} )                                   
   endif()                                                              
 endif()
 
@@ -72,7 +72,7 @@ endif()
 find_package(PkgConfig)
 
 #Determine from PKG
-if( PKG_CONFIG_FOUND AND NOT FFTW_ROOT )
+if( PKG_CONFIG_FOUND AND NOT FFTW_DIR )
   pkg_check_modules( PKG_FFTW QUIET "fftw3" )
 endif()
 
@@ -88,12 +88,12 @@ endif()
 #initialize library variables
 foreach(_LIBSTUB IN LISTS FFTW_LIBRARY_STUBS)
   
-  if( FFTW_ROOT )
+  if( FFTW_DIR )
     
     find_library(
       FFTW_SERIAL_STUBLIB
       NAMES ${_LIBSTUB} lib${_LIBSTUB}
-      PATHS ${FFTW_ROOT}
+      PATHS ${FFTW_DIR}
       PATH_SUFFIXES "lib" "lib64"
       NO_DEFAULT_PATH
       )
@@ -101,7 +101,7 @@ foreach(_LIBSTUB IN LISTS FFTW_LIBRARY_STUBS)
     find_library(
       FFTW_OPENMP_STUBLIB
       NAMES ${_LIBSTUB}_omp lib${_LIBSTUB}_omp
-      PATHS ${FFTW_ROOT}
+      PATHS ${FFTW_DIR}
       PATH_SUFFIXES "lib" "lib64"
       NO_DEFAULT_PATH
       )
@@ -109,12 +109,12 @@ foreach(_LIBSTUB IN LISTS FFTW_LIBRARY_STUBS)
     find_library(
       FFTW_THREADS_STUBLIB
       NAMES ${_LIBSTUB}_threads lib${_LIBSTUB}_threads
-      PATHS ${FFTW_ROOT}
+      PATHS ${FFTW_DIR}
       PATH_SUFFIXES "lib" "lib64"
       NO_DEFAULT_PATH
       )
     
-  else( FFTW_ROOT )
+  else( FFTW_DIR )
     find_library(
       FFTW_SERIAL_STUBLIB
       NAMES ${_LIBSTUB} lib${_LIBSTUB}
@@ -134,7 +134,7 @@ foreach(_LIBSTUB IN LISTS FFTW_LIBRARY_STUBS)
       PATHS ${PKG_FFTW_LIBRARY_DIRS} ${LIB_INSTALL_DIR}
       )
     
-  endif( FFTW_ROOT )
+  endif( FFTW_DIR )
 
   if(EXISTS ${FFTW_SERIAL_STUBLIB})
 
@@ -202,12 +202,12 @@ foreach(_LIBSTUB IN LISTS FFTW_LIBRARY_STUBS)
 endforeach()
 
 #find includes
-if( FFTW_ROOT )
+if( FFTW_DIR )
   
   find_path(
     FFTW_INCLUDES
     NAMES "fftw3.h"
-    PATHS ${FFTW_ROOT}
+    PATHS ${FFTW_DIR}
     PATH_SUFFIXES "include"
     NO_DEFAULT_PATH
     )
@@ -220,7 +220,7 @@ else()
     PATHS ${PKG_FFTW_INCLUDE_DIRS} ${INCLUDE_INSTALL_DIR}
     )
 
-endif( FFTW_ROOT )
+endif( FFTW_DIR )
 
 if(EXISTS ${FFTW_INCLUDES})
   set(FFTW_INCLUDE_DIR ${FFTW_INCLUDES})

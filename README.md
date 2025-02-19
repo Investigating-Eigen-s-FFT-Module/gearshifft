@@ -92,9 +92,9 @@ An example:
 BOOST_VER=1.67.0
 FFTW_VER=3.3.8
 BOOST_ROOT=${HOME}/sw/boost-${BOOST_VER}
-FFTW_ROOT=${HOME}/sw/fftw-${FFTW_VER}/
+FFTW_DIR=${HOME}/sw/fftw-${FFTW_VER}/
 
-export CMAKE_PREFIX_PATH==${BOOST_ROOT}/lib:${BOOST_ROOT}/include:${FFTW_ROOT}:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH==${BOOST_ROOT}/lib:${BOOST_ROOT}/include:${FFTW_DIR}:${CMAKE_PREFIX_PATH}
 if [ -d "CMakeFiles" ]; then
   make clean
   rm -rf CMakeFiles CMakeCache.txt cmake_install.cmake Makefile
@@ -143,7 +143,7 @@ VERS=3.3.8
 VERS_single=${VERS}_single
 VERS_double=${VERS}_double
 # the install directory for fftw and fftwf
-FFTW_ROOT=${HOME}/sw/fftw-${VERS}/
+FFTW_DIR=${HOME}/sw/fftw-${VERS}/
 # "./compile_fftw.sh clean" removes directories
 if [ "$1" == "clean" ]; then
   echo "clean sources"
@@ -158,7 +158,7 @@ if [ ! -d "fftw-${VERS_single}" ] && [ ! -d "fftw-${VERS_double}" ]; then
   cp -r fftw-${VERS_single} fftw-${VERS_double}
 fi
 IFLAG_STD="--enable-static=yes --enable-shared=yes --with-gnu-ld  --enable-silent-rules --with-pic"
-IFLAGS="--prefix=${FFTW_ROOT} --enable-openmp --enable-sse2 -q $IFLAG_STD"
+IFLAGS="--prefix=${FFTW_DIR} --enable-openmp --enable-sse2 -q $IFLAG_STD"
 # float
 cd fftw-${VERS_single}/fftw-${VERS}
 ./configure $IFLAGS "--enable-float"

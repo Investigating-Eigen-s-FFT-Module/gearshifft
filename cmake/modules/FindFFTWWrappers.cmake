@@ -15,9 +15,9 @@
 #   FFTWWrappers_LIBRARY_DIR	   ... fftw library directory
 #
 # The following variables will be checked by the function
-#   FFTWWrappers_ROOT              ... if set, the libraries are exclusively searched
+#   FFTWWrappers_DIR              ... if set, the libraries are exclusively searched
 #                                      under this path
-#   MKL_ROOT                       ... take the MKL libraries from here
+#   MKL_DIR                       ... take the MKL libraries from here
 #
 
 if(GEARSHIFFT_USE_STATIC_LIBS)
@@ -30,19 +30,19 @@ else()
   message("FFTWWrappers will prefer libraries with no prefix and no suffix")
 endif()
 
-# If environment variable FFTWWrappers_ROOT is defined, it has the same effect as the cmake variable
-if( NOT FFTWWrappers_ROOT AND DEFINED ENV{FFTWWrappers_ROOT} )
-  if( EXISTS "$ENV{FFTWWrappers_ROOT}/" )
-    set( FFTWWrappers_ROOT $ENV{FFTWWrappers_ROOT} )
+# If environment variable FFTWWrappers_DIR is defined, it has the same effect as the cmake variable
+if( NOT FFTWWrappers_DIR AND DEFINED ENV{FFTWWrappers_DIR} )
+  if( EXISTS "$ENV{FFTWWrappers_DIR}/" )
+    set( FFTWWrappers_DIR $ENV{FFTWWrappers_DIR} )
   else()
-    message( "FFTWWrappers_ROOT set to ${FFTWWrappers_ROOT}, but folder does not exist")
+    message( "FFTWWrappers_DIR set to ${FFTWWrappers_DIR}, but folder does not exist")
   endif()
 endif()
 
-# If environment variable MKL_ROOT is defined, it has the same effect as the cmake variable
-if( NOT MKL_ROOT AND DEFINED ENV{MKLROOT})
+# If environment variable MKL_DIR is defined, it has the same effect as the cmake variable
+if( NOT MKL_DIR AND DEFINED ENV{MKLROOT})
   if( EXISTS "$ENV{MKLROOT}/" )
-    set( MKL_ROOT $ENV{MKLROOT} )
+    set( MKL_DIR $ENV{MKLROOT} )
   else()
     message( "MKLROOT set to $ENV{MKLROOT}, but folder does not exist")
   endif()
@@ -62,14 +62,14 @@ endif()
 find_library(
   FFTWWrappers_GNU_LIBRARIES
   NAMES ${PREFERENCE_LIBRARY_PREFIX}fftw3xc_gnu${PREFERENCE_LIBRARY_SUFFIX} fftw3xc_gnu
-  PATHS ${FFTWWrappers_ROOT}
+  PATHS ${FFTWWrappers_DIR}
   PATH_SUFFIXES "lib" "lib64"
   NO_DEFAULT_PATH
   )
 find_library(
   FFTWWrappers_GNU_LIBRARIES
   NAMES ${PREFERENCE_LIBRARY_PREFIX}fftw3xc_gnu${PREFERENCE_LIBRARY_SUFFIX} fftw3xc_gnu
-  PATHS ${MKL_ROOT}
+  PATHS ${MKL_DIR}
   PATH_SUFFIXES "lib/${MKL_INTERFACE_LIBDIR}_lin" "lib/${MKL_INTERFACE_LIBDIR}_mac" "lib/${MKL_INTERFACE_LIBDIR}"
   NO_DEFAULT_PATH
   )
@@ -85,14 +85,14 @@ endif()
 find_library(
   FFTWWrappers_INTEL_LIBRARIES
   NAMES ${PREFERENCE_LIBRARY_PREFIX}fftw3xc_intel${PREFERENCE_LIBRARY_SUFFIX} fftw3xc_intel
-  PATHS ${FFTWWrappers_ROOT}
+  PATHS ${FFTWWrappers_DIR}
   PATH_SUFFIXES "lib" "lib64"
   NO_DEFAULT_PATH
   )
 find_library(
   FFTWWrappers_INTEL_LIBRARIES
   NAMES ${PREFERENCE_LIBRARY_PREFIX}fftw3xc_intel${PREFERENCE_LIBRARY_SUFFIX} fftw3xc_intel
-  PATHS ${MKL_ROOT}
+  PATHS ${MKL_DIR}
   PATH_SUFFIXES "lib/${MKL_INTERFACE_LIBDIR}_lin" "lib/${MKL_INTERFACE_LIBDIR}_mac" "lib/${MKL_INTERFACE_LIBDIR}_win" "lib/${MKL_INTERFACE_LIBDIR}"
   NO_DEFAULT_PATH
 )
@@ -108,14 +108,14 @@ endif()
 find_library(
   FFTWWrappers_MSVS_LIBRARIES
   NAMES fftw3xc_msvs
-  PATHS ${FFTWWrappers_ROOT}
+  PATHS ${FFTWWrappers_DIR}
   PATH_SUFFIXES "lib" "lib64"
   NO_DEFAULT_PATH
   )
 find_library(
   FFTWWrappers_MSVS_LIBRARIES
   NAMES fftw3xc_msvs
-  PATHS ${MKL_ROOT}
+  PATHS ${MKL_DIR}
   PATH_SUFFIXES "lib/${MKL_INTERFACE_LIBDIR}_win" "lib/${MKL_INTERFACE_LIBDIR}"
   NO_DEFAULT_PATH
   )
@@ -133,7 +133,7 @@ endif()
 find_file(
   FFTWWrapper_include_file
   NAMES fftw3.h
-  PATHS ${MKL_ROOT} ${MKL_ROOT}/include/fftw
+  PATHS ${MKL_DIR} ${MKL_DIR}/include/fftw
   PATH_SUFFIXES "include" "include/fftw"
   NO_DEFAULT_PATH
   )
@@ -141,13 +141,13 @@ find_file(
 if(EXISTS ${FFTWWrapper_include_file})
   get_filename_component(FFTWWrappers_MKL_INCLUDE_DIR ${FFTWWrapper_include_file} DIRECTORY)
 else()
-  message( "FFTWWrappers was not able to find fftw3.h in ${MKL_ROOT}")
+  message( "FFTWWrappers was not able to find fftw3.h in ${MKL_DIR}")
 endif()
 
 find_library(
   MKL_INTEL
   NAMES ${PREFERENCE_LIBRARY_PREFIX}${MKL_INTERFACE_LIBNAME}${PREFERENCE_LIBRARY_SUFFIX} ${MKL_INTERFACE_LIBNAME}
-  PATHS ${MKL_ROOT}
+  PATHS ${MKL_DIR}
   PATH_SUFFIXES "lib" "lib/${MKL_INTERFACE_LIBDIR}_lin" "lib/${MKL_INTERFACE_LIBDIR}_mac" "lib/${MKL_INTERFACE_LIBDIR}_win" "lib/${MKL_INTERFACE_LIBDIR}"
   NO_DEFAULT_PATH
   )
@@ -155,13 +155,13 @@ find_library(
 if(EXISTS ${MKL_INTEL})
   list(APPEND FFTWWrappers_MKL_LIBRARIES "${MKL_INTEL}")
 else()
-  message( "FFTWWrappers was not able to find ${MKL_INTERFACE_LIBNAME} in ${MKL_ROOT}")
+  message( "FFTWWrappers was not able to find ${MKL_INTERFACE_LIBNAME} in ${MKL_DIR}")
 endif()
 
 find_library(
   MKL_INTEL_THREAD
   NAMES ${PREFERENCE_LIBRARY_PREFIX}mkl_intel_thread${PREFERENCE_LIBRARY_SUFFIX} mkl_intel_thread
-  PATHS ${MKL_ROOT}
+  PATHS ${MKL_DIR}
   PATH_SUFFIXES "lib" "lib/${MKL_INTERFACE_LIBDIR}_lin" "lib/${MKL_INTERFACE_LIBDIR}_mac" "lib/${MKL_INTERFACE_LIBDIR}_win" "lib/${MKL_INTERFACE_LIBDIR}"
   NO_DEFAULT_PATH
   )
@@ -169,13 +169,13 @@ find_library(
 if(EXISTS ${MKL_INTEL_THREAD})
   list(APPEND FFTWWrappers_MKL_LIBRARIES "${MKL_INTEL_THREAD}")
 else()
-  message( "FFTWWrappers was not able to find mkl_intel_thread in ${MKL_ROOT}")
+  message( "FFTWWrappers was not able to find mkl_intel_thread in ${MKL_DIR}")
 endif()
 
 find_library(
   MKL_CORE
   NAMES ${PREFERENCE_LIBRARY_PREFIX}mkl_core${PREFERENCE_LIBRARY_SUFFIX} mkl_core
-  PATHS ${MKL_ROOT}
+  PATHS ${MKL_DIR}
   PATH_SUFFIXES "lib" "lib/${MKL_INTERFACE_LIBDIR}_lin" "lib/${MKL_INTERFACE_LIBDIR}_mac" "lib/${MKL_INTERFACE_LIBDIR}_win" "lib/${MKL_INTERFACE_LIBDIR}"
   NO_DEFAULT_PATH
   )
@@ -183,18 +183,18 @@ find_library(
 if(EXISTS ${MKL_CORE})
   list(APPEND FFTWWrappers_MKL_LIBRARIES "${MKL_CORE}")
 else()
-  message("FFTWWrappers was not able to find mkl_core in ${MKL_ROOT}")
+  message("FFTWWrappers was not able to find mkl_core in ${MKL_DIR}")
 endif()
 
-list(APPEND FFTWWrappers_MKL_LIBRARY_DIRS "${MKL_ROOT}/../compiler/lib/${MKL_INTERFACE_LIBDIR}")
-list(APPEND FFTWWrappers_MKL_LIBRARY_DIRS "${MKL_ROOT}/../tbb/lib/${MKL_INTERFACE_LIBDIR}/gcc4.4")
+list(APPEND FFTWWrappers_MKL_LIBRARY_DIRS "${MKL_DIR}/../compiler/lib/${MKL_INTERFACE_LIBDIR}")
+list(APPEND FFTWWrappers_MKL_LIBRARY_DIRS "${MKL_DIR}/../tbb/lib/${MKL_INTERFACE_LIBDIR}/gcc4.4")
 
 # NOTE: According to Intel documentation, it is generally not recommended to
 # link against the static variants of the openMP libraries so we put them last:
 find_library(
   MKL_IOMP5
   NAMES iomp5 libiomp5.a libiomp5md
-  PATHS ${MKL_ROOT} ${MKL_ROOT}/../compiler ${MKL_ROOT}/../tbb
+  PATHS ${MKL_DIR} ${MKL_DIR}/../compiler ${MKL_DIR}/../tbb
   PATH_SUFFIXES "lib" "lib/${MKL_INTERFACE_LIBDIR}_lin" "lib/${MKL_INTERFACE_LIBDIR}_mac" "lib/${MKL_INTERFACE_LIBDIR}_win" "lib/${MKL_INTERFACE_LIBDIR}" "lib/${MKL_INTERFACE_LIBDIR}/gcc4.4"
   NO_DEFAULT_PATH
   )
