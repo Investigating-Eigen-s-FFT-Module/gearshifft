@@ -1,0 +1,6 @@
+[submodule "eigen-test"]
+	path = eigen-test
+	url = git@github.com:Investigating-Eigen-s-FFT-Module/eigen-gitlab.git
+[submodule "eigen-official"]
+	path = eigen-official
+	url = https://gitlab.com/libeigen/eigen.git

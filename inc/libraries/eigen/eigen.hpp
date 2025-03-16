@@ -23,8 +23,8 @@
                                                 // is no dynamic allocation during other stages
                                                 // todo: remove once certain that no assertions are broken
                                                 //       as it adds overhead in measurements
-#include <eigen3/Eigen/Core>
-#include <eigen3/unsupported/Eigen/FFT>
+#include <Eigen/Core>
+#include <unsupported/Eigen/FFT>
 
 // fft back-end selection at runtime proved impossible without Eigen API changes or overhead in benchmarks
 // Instead, several targets will be created using the FFT header's macros.

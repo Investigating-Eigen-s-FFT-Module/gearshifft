@@ -507,7 +507,11 @@ endif()
 #------------------------------------------------------------------------------
 
 if(GEARSHIFFT_BACKEND_EIGEN)
-  find_package(Eigen3 ${_QUIET})
+  if(GEARSHIFFT_BACKEND_EIGEN_USE_TEST)
+    include("${GEARSHIFFT_ROOT}/cmake/modules/FindEigen3Mine.cmake")
+  else()
+    include("${GEARSHIFFT_ROOT}/cmake/modules/FindEigen3.cmake")
+  endif()
   
   if(Eigen3_FOUND)
     add_library(EIGEN INTERFACE)
