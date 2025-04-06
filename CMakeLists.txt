@@ -550,28 +550,22 @@ if(GEARSHIFFT_BACKEND_EIGEN)
     endif(FFTW_FOUND)
 
     # Eigen with MKL back-end
-    set(ENABLE_CDFT ON)             # options for MKL find_package
-    set(MKL_THREADING "gnu_thread") # todo: make this smarter to support intel compiler as options. Should also update eigen.hpp msg's
+    # set(ENABLE_CDFT ON)             # options for MKL find_package
+    # set(MKL_THREADING "intel_thread") # todo: make this smarter to support intel compiler as options. Should also update eigen.hpp msg's
     find_package(MKL CONFIG ${_QUIET})
     
     if(MKL_FOUND)
       add_library(EIGEN_MKL INTERFACE)
       add_library(gearshifft::EIGEN_MKL ALIAS EIGEN_MKL)
-      target_link_libraries(EIGEN_MKL INTERFACE
-        EIGEN
-        MKL::MKL_CDFT
+
+      target_compile_options(EIGEN_MKL INTERFACE $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
+      target_include_directories(EIGEN_MKL INTERFACE $<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
+      target_link_libraries(EIGEN_MKL INTERFACE $<LINK_ONLY:MKL::MKL> EIGEN)
+
+      target_compile_definitions(EIGEN_MKL INTERFACE
+        EIGEN_MKL_DEFAULT
       )
-      get_target_property(_mkl_compile_opts MKL::MKL INTERFACE_COMPILE_DEFINITIONS)
-      if(_mkl_compile_opts)
-        target_compile_definitions(EIGEN_MKL INTERFACE
-          EIGEN_MKL_DEFAULT
-          ${_mkl_compile_opts}
-        )
-      else()
-        target_compile_definitions(EIGEN_MKL INTERFACE
-          EIGEN_MKL_DEFAULT
-        )
-      endif()
+
       message(STATUS " gearshifft::EIGEN_MKL enabled.")
     endif(MKL_FOUND)
 
